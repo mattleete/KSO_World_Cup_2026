@@ -25,7 +25,7 @@ export default function Rules() {
   return (
     <div>
       {/* Hero */}
-      <div className="px-8 lg:px-[68px] py-16 lg:py-[91px]">
+      <div className="py-16 lg:py-[91px]">
         <h1
           className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
           style={{ letterSpacing: '-2.88px' }}
@@ -35,7 +35,7 @@ export default function Rules() {
       </div>
 
       {/* Rules content */}
-      <div className="px-8 lg:px-[68px] pb-16 flex flex-col gap-8 max-w-3xl">
+      <div className="pb-16 flex flex-col gap-8 max-w-3xl">
         {RULES.map(rule => (
           <div key={rule.heading} className="flex flex-col gap-2">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">

@@ -10,7 +10,7 @@ export default function Teams() {
   return (
     <div>
       {/* Hero */}
-      <div className="px-8 lg:px-[68px] py-16 lg:py-[91px]">
+      <div className="py-16 lg:py-[91px]">
         <h1
           className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
           style={{ letterSpacing: '-2.88px' }}
@@ -23,7 +23,7 @@ export default function Teams() {
       </div>
 
       {/* Tiles grid */}
-      <div className="px-8 lg:px-[68px] pb-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+      <div className="pb-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {sorted.map(team => {
           const owner = getOwner(team.id)
           return (

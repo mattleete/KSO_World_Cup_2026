@@ -13,7 +13,7 @@ function FixtureRow({ match, ownerByTeamName }) {
   return (
     <div className="flex flex-col gap-2">
       {/* Date / score line */}
-      <p className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] text-center">
+      <p className="text-[18px] sm:text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] text-center">
         {hasScore
           ? `${match.score1} – ${match.score2}`
           : match.date ? toAEST(match.date) : 'TBC'
@@ -21,30 +21,30 @@ function FixtureRow({ match, ownerByTeamName }) {
       </p>
 
       {/* Teams row */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {/* Home side: owner · country · flag */}
-        <div className="flex-1 flex items-center justify-end gap-4 sm:gap-8 min-w-0">
+        <div className="flex-1 flex items-center justify-end gap-2 sm:gap-8 min-w-0">
           {homeOwnerName && (
             <p className="hidden sm:block text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
               {homeOwnerName}
             </p>
           )}
-          <div className="flex items-center gap-4 min-w-0">
-            <p className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <p className="text-[15px] sm:text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
               {match.team1 ?? 'TBC'}
             </p>
-            <span className="text-[36px] shrink-0">{homeTeam?.flag ?? '🏳️'}</span>
+            <span className="text-[24px] sm:text-[36px] shrink-0">{homeTeam?.flag ?? '🏳️'}</span>
           </div>
         </div>
 
         {/* VS */}
-        <p className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] shrink-0">VS</p>
+        <p className="text-[13px] sm:text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] shrink-0 text-[#0a0a0a]/40 sm:text-[#0a0a0a]">VS</p>
 
         {/* Away side: flag · country · owner */}
-        <div className="flex-1 flex items-center justify-start gap-4 sm:gap-8 min-w-0">
-          <div className="flex items-center gap-4 min-w-0">
-            <span className="text-[36px] shrink-0">{awayTeam?.flag ?? '🏳️'}</span>
-            <p className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
+        <div className="flex-1 flex items-center justify-start gap-2 sm:gap-8 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <span className="text-[24px] sm:text-[36px] shrink-0">{awayTeam?.flag ?? '🏳️'}</span>
+            <p className="text-[15px] sm:text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
               {match.team2 ?? 'TBC'}
             </p>
           </div>

@@ -235,9 +235,12 @@ function LeagueCard({ membership, onGoToDraft }) {
         </div>
         <button
           onClick={copyLink}
-          className="w-full bg-white rounded-lg px-4 py-3 text-[13px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] transition-colors cursor-pointer text-left"
+          className="w-full bg-white rounded-lg px-4 py-3 text-[13px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] transition-colors cursor-pointer text-left flex items-center gap-3 min-w-0"
         >
-          {copiedLink ? 'Link copied!' : `Copy invite link → ${inviteUrl}`}
+          <span className="shrink-0">{copiedLink ? 'Link copied!' : 'Copy invite link'}</span>
+          {!copiedLink && (
+            <span className="text-[#0a0a0a]/20 font-normal normal-case tracking-normal truncate">{inviteUrl}</span>
+          )}
         </button>
       </div>
     </div>

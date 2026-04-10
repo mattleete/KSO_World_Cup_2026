@@ -284,19 +284,19 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
                     : 'bg-[#e9e9e9]'
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <span className="text-[36px] leading-none">{team.flag}</span>
-                  <p className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em]">
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                  <span className="text-[28px] sm:text-[36px] leading-none shrink-0">{team.flag}</span>
+                  <p className="text-[16px] sm:text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
                     {team.name}
                   </p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0 ml-2">
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
                   {picker && (
-                    <p className="text-[14px] text-[#0a0a0a]/70 font-medium">
+                    <p className="text-[12px] sm:text-[14px] text-[#0a0a0a]/70 font-medium truncate max-w-[60px] sm:max-w-none">
                       {picker.display_name}
                     </p>
                   )}
-                  <p className="text-[14px] text-[#0a0a0a]/40">
+                  <p className="text-[12px] sm:text-[14px] text-[#0a0a0a]/40">
                     {MULTIPLIER_LABEL[team.tier]}
                   </p>
                 </div>

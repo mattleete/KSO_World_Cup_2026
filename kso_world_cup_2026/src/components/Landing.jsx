@@ -16,13 +16,11 @@ export default function Landing() {
         : 'The world cup is underway'
 
   return (
-    <div className="px-8 lg:px-[68px] py-16 lg:py-[91px]">
-      <h1
-        className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
-        style={{ letterSpacing: '-2.88px' }}
-      >
-        {heroText}
-      </h1>
-    </div>
+    <h1
+      className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
+      style={{ letterSpacing: '-2.88px' }}
+    >
+      {heroText}
+    </h1>
   )
 }
