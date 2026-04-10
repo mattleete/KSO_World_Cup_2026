@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { fetchFixtures, toAEST } from '../utils/api'
-import { getOwnerByTeamName } from '../data/players'
-import { getTeamByName } from '../data/teams'
+import { getTeamByName, getTeamById } from '../data/teams'
 
-function FixtureRow({ match }) {
-  const homeOwner = getOwnerByTeamName(match.team1)
-  const awayOwner = getOwnerByTeamName(match.team2)
-  const homeTeam  = getTeamByName(match.team1)
-  const awayTeam  = getTeamByName(match.team2)
-  const hasScore  = match.score1 !== null && match.score2 !== null
+function FixtureRow({ match, ownerByTeamName }) {
+  const homeOwnerName = ownerByTeamName?.[match.team1] ?? null
+  const awayOwnerName = ownerByTeamName?.[match.team2] ?? null
+  const homeTeam = getTeamByName(match.team1)
+  const awayTeam = getTeamByName(match.team2)
+  const hasScore = match.score1 !== null && match.score2 !== null
 
   return (
     <div className="flex flex-col gap-2">
@@ -22,11 +22,11 @@ function FixtureRow({ match }) {
 
       {/* Teams row */}
       <div className="flex items-center gap-4">
-        {/* Home side: player · country · flag */}
+        {/* Home side: owner · country · flag */}
         <div className="flex-1 flex items-center justify-end gap-4 sm:gap-8 min-w-0">
-          {homeOwner && (
+          {homeOwnerName && (
             <p className="hidden sm:block text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
-              {homeOwner.name}
+              {homeOwnerName}
             </p>
           )}
           <div className="flex items-center gap-4 min-w-0">
@@ -38,11 +38,9 @@ function FixtureRow({ match }) {
         </div>
 
         {/* VS */}
-        <p className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] shrink-0">
-          VS
-        </p>
+        <p className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] shrink-0">VS</p>
 
-        {/* Away side: flag · country · player */}
+        {/* Away side: flag · country · owner */}
         <div className="flex-1 flex items-center justify-start gap-4 sm:gap-8 min-w-0">
           <div className="flex items-center gap-4 min-w-0">
             <span className="text-[36px] shrink-0">{awayTeam?.flag ?? '🏳️'}</span>
@@ -50,9 +48,9 @@ function FixtureRow({ match }) {
               {match.team2 ?? 'TBC'}
             </p>
           </div>
-          {awayOwner && (
+          {awayOwnerName && (
             <p className="hidden sm:block text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
-              {awayOwner.name}
+              {awayOwnerName}
             </p>
           )}
         </div>
@@ -61,26 +59,64 @@ function FixtureRow({ match }) {
   )
 }
 
-export default function Fixtures() {
+export default function Fixtures({ context }) {
   const [fixtures, setFixtures] = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(null)
+  const [ownerByTeamName, setOwnerByTeamName] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetchFixtures()
-      .then(setFixtures)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
+    async function load() {
+      try {
+        const promises = [fetchFixtures()]
 
-  // Find the first upcoming match for the hero
+        // If we have a group context, also fetch draft picks to show ownership
+        if (context) {
+          promises.push(
+            supabase.from('draft_session').select().eq('group_id', context.group.id).maybeSingle(),
+            supabase.from('group_members').select().eq('group_id', context.group.id),
+          )
+        }
+
+        const [fixturesData, sessionRes, membersRes] = await Promise.all(promises)
+        setFixtures(fixturesData)
+
+        if (context && sessionRes?.data && membersRes?.data) {
+          const picksRes = await supabase
+            .from('draft_picks')
+            .select()
+            .eq('draft_session_id', sessionRes.data.id)
+
+          if (picksRes.data) {
+            const members = membersRes.data
+            const lookup = {}
+            picksRes.data.forEach(pick => {
+              const team = getTeamById(pick.team_id)
+              const member = members.find(m => m.id === pick.group_member_id)
+              if (team && member) {
+                lookup[team.name] = member.display_name
+                if (team.apiName) lookup[team.apiName] = member.display_name
+              }
+            })
+            setOwnerByTeamName(lookup)
+          }
+        }
+      } catch (e) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    load()
+  }, [context])
+
   const now = new Date()
   const nextMatch = fixtures.find(m => !m.score1 && m.date && new Date(m.date) > now)
   const heroText = nextMatch
     ? `The next match is ${nextMatch.team1 ?? 'TBC'} vs ${nextMatch.team2 ?? 'TBC'}`
     : 'Fixtures'
 
-  // Group fixtures by stage
   const groups = fixtures.reduce((acc, match) => {
     const key = match.stage ?? 'Other'
     if (!acc[key]) acc[key] = []
@@ -90,8 +126,7 @@ export default function Fixtures() {
 
   return (
     <div>
-      {/* Hero */}
-      <div className="px-8 lg:px-[68px] py-16 lg:py-[91px]">
+      <div className="py-16 lg:py-[91px]">
         <h1
           className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
           style={{ letterSpacing: '-2.88px' }}
@@ -100,29 +135,16 @@ export default function Fixtures() {
         </h1>
       </div>
 
-      {loading && (
-        <div className="px-8 lg:px-[68px] pb-16 text-[14px] text-[#0a0a0a]/50">
-          Loading fixtures…
-        </div>
-      )}
-
-      {error && (
-        <div className="px-8 lg:px-[68px] pb-16">
-          <p className="text-[14px] text-red-600">Could not load fixtures — {error}</p>
-        </div>
-      )}
-
+      {loading && <p className="text-[14px] text-[#0a0a0a]/50">Loading fixtures…</p>}
+      {error && <p className="text-[14px] text-red-600">Could not load fixtures — {error}</p>}
       {!loading && !error && fixtures.length === 0 && (
-        <div className="px-8 lg:px-[68px] pb-16 text-[14px] text-[#0a0a0a]/50">
-          No fixtures available yet.
-        </div>
+        <p className="text-[14px] text-[#0a0a0a]/50">No fixtures available yet.</p>
       )}
 
       {!loading && !error && (
-        <div className="px-8 lg:px-[68px] pb-16 flex flex-col gap-16">
+        <div className="pb-16 flex flex-col gap-16">
           {Object.entries(groups).map(([stage, matches]) => (
             <div key={stage} className="flex flex-col gap-8">
-              {/* Stage heading */}
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
                 {stage}
               </p>
@@ -131,6 +153,7 @@ export default function Fixtures() {
                   <FixtureRow
                     key={`${match.team1}-${match.team2}-${match.date}-${i}`}
                     match={match}
+                    ownerByTeamName={ownerByTeamName}
                   />
                 ))}
               </div>

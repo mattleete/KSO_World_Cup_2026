@@ -43,8 +43,8 @@ export default function App() {
   // Render the active tab content
   function renderTab() {
     if (activeTab === null)       return <Landing />
-    if (activeTab === 'picks')    return <PlayerBoard />
-    if (activeTab === 'fixtures') return <Fixtures />
+    if (activeTab === 'picks')    return <PlayerBoard context={context} />
+    if (activeTab === 'fixtures') return <Fixtures context={context} />
     if (activeTab === 'teams')    return <Teams />
     if (activeTab === 'rules')    return <Rules />
 
