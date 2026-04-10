@@ -3,6 +3,7 @@ const TABS = [
   { id: 'fixtures', label: 'Fixtures',            short: 'Fixtures' },
   { id: 'teams',    label: 'Team Info',            short: 'Teams'    },
   { id: 'rules',    label: 'Rules',                short: 'Rules'    },
+  { id: 'leagues',  label: 'Leagues',              short: 'Leagues'  },
   { id: 'draft',    label: 'Draft',               short: 'Draft'    },
 ]
 

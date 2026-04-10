@@ -9,6 +9,7 @@ import Rules from './components/Rules'
 import Login from './components/Login'
 import GroupFlow from './components/GroupFlow'
 import Draft from './components/Draft'
+import Leagues from './components/Leagues'
 
 // Capture auth callback params before Supabase cleans the URL.
 // PKCE flow uses ?code=, implicit flow uses #access_token=
@@ -47,6 +48,21 @@ export default function App() {
     if (activeTab === 'fixtures') return <Fixtures context={context} />
     if (activeTab === 'teams')    return <Teams />
     if (activeTab === 'rules')    return <Rules />
+
+    if (activeTab === 'leagues') {
+      if (session === undefined)  return null
+      if (!session)               return <Login inviteCode={inviteCode} />
+      return (
+        <Leagues
+          user={session.user}
+          inviteCode={inviteCode}
+          onGoToDraft={membership => {
+            setContext({ group: membership.groups, membership })
+            setActiveTab('draft')
+          }}
+        />
+      )
+    }
 
     if (activeTab === 'draft') {
       if (session === undefined)  return null
