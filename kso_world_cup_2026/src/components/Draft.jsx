@@ -76,7 +76,7 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
 
 // ── Draft board ───────────────────────────────────────────────────────────────
 
-function DraftBoard({ group, membership, members, draftSession, draftOrder, picks }) {
+function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
   const pickedTeams = Object.fromEntries(picks.map(p => [p.team_id, p]))
 
@@ -108,6 +108,10 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
             {TEAMS.length - picks.length} remaining
           </p>
         )}
+        {isMyTurn && !isDone && (
+          <p className="text-[16px] text-[#0a0a0a]">Click a team below to make your pick.</p>
+        )}
+        {pickError && <p className="text-red-500 text-[14px]">{pickError}</p>}
       </div>
 
       {/* Pick order — next 5 picks */}
@@ -148,12 +152,18 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
             const pick = pickedTeams[team.id]
             const picker = pick ? memberMap[pick.group_member_id] : null
             const isPicked = !!pick
+            const isClickable = isMyTurn && !isPicked && !isDone && !picking
 
             return (
               <div
                 key={team.id}
-                className={`rounded-[4px] p-2 flex items-center justify-between h-14 transition-opacity ${
-                  isPicked ? 'bg-[#e9e9e9] opacity-40' : 'bg-[#e9e9e9]'
+                onClick={() => isClickable && onPick(team.id)}
+                className={`rounded-[4px] p-2 flex items-center justify-between h-14 transition-all ${
+                  isPicked
+                    ? 'bg-[#e9e9e9] opacity-40'
+                    : isClickable
+                    ? 'bg-[#e9e9e9] cursor-pointer hover:bg-[#d8d8d8] active:scale-[0.98]'
+                    : 'bg-[#e9e9e9]'
                 }`}
               >
                 <div className="flex items-center gap-4">
@@ -217,6 +227,8 @@ export default function Draft({ context }) {
   const [picks, setPicks] = useState([])
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [pickError, setPickError] = useState(null)
   const [error, setError] = useState(null)
 
   // Load initial data
@@ -266,6 +278,17 @@ export default function Draft({ context }) {
 
     return () => supabase.removeChannel(channel)
   }, [draftSession?.id])
+
+  async function handlePick(teamId) {
+    setPicking(true)
+    setPickError(null)
+    const { error } = await supabase.rpc('make_pick', {
+      p_draft_session_id: draftSession.id,
+      p_team_id: teamId,
+    })
+    if (error) setPickError(error.message)
+    setPicking(false)
+  }
 
   async function handleStartDraft() {
     setStarting(true)
@@ -329,6 +352,9 @@ export default function Draft({ context }) {
       draftSession={draftSession}
       draftOrder={draftOrder}
       picks={picks}
+      onPick={handlePick}
+      picking={picking}
+      pickError={pickError}
     />
   )
 }
