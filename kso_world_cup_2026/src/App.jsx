@@ -8,6 +8,7 @@ import Teams from './components/Teams'
 import Rules from './components/Rules'
 import Login from './components/Login'
 import GroupFlow from './components/GroupFlow'
+import Draft from './components/Draft'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(null)
@@ -51,7 +52,7 @@ export default function App() {
       if (session === undefined)  return null
       if (!session)               return <Login inviteCode={inviteCode} />
       if (!context)               return <GroupFlow user={session.user} inviteCode={inviteCode} onReady={setContext} />
-      return <DraftRoom context={context} onSwitchGroup={() => setContext(null)} />
+      return <Draft context={context} />
     }
   }
 
@@ -71,25 +72,3 @@ export default function App() {
   )
 }
 
-// Placeholder — replaced in Phase 3
-function DraftRoom({ context, onSwitchGroup }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-[1.1] tracking-[-0.02em]">
-        {context.group.name}
-      </p>
-      <p className="text-[#0a0a0a]/50 text-[16px]">
-        Playing as <span className="text-[#0a0a0a]">{context.membership.display_name}</span>
-        {' · '}
-        Invite code: <span className="text-[#0a0a0a] font-mono">{context.group.invite_code}</span>
-      </p>
-      <p className="text-[#0a0a0a]/50 text-[14px] mt-4">Draft room coming in Phase 3.</p>
-      <button
-        onClick={onSwitchGroup}
-        className="text-[13px] text-[#0a0a0a]/40 hover:text-[#0a0a0a]/70 underline cursor-pointer bg-transparent border-none p-0 w-fit"
-      >
-        Switch group
-      </button>
-    </div>
-  )
-}
