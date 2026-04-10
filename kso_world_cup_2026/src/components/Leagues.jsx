@@ -174,7 +174,10 @@ function JoinForm({ user, prefillCode, onJoined, onCancel }) {
 
 function LeagueCard({ membership, onGoToDraft }) {
   const [copied, setCopied] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
   const [memberCount, setMemberCount] = useState(null)
+
+  const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${membership.groups.invite_code}`
 
   useEffect(() => {
     supabase
@@ -188,6 +191,12 @@ function LeagueCard({ membership, onGoToDraft }) {
     navigator.clipboard.writeText(membership.groups.invite_code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function copyLink() {
+    navigator.clipboard.writeText(inviteUrl)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
   }
 
   return (
@@ -204,23 +213,31 @@ function LeagueCard({ membership, onGoToDraft }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1 bg-white rounded-lg px-4 py-3 flex items-center justify-between">
-          <p className="text-[14px] font-mono tracking-[0.08em] text-[#0a0a0a]">
-            {membership.groups.invite_code}
-          </p>
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-2">
+          <div className="flex-1 bg-white rounded-lg px-4 py-3 flex items-center justify-between">
+            <p className="text-[14px] font-mono tracking-[0.08em] text-[#0a0a0a]">
+              {membership.groups.invite_code}
+            </p>
+            <button
+              onClick={copyCode}
+              className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] transition-colors cursor-pointer bg-transparent border-none"
+            >
+              {copied ? 'Copied!' : 'Copy code'}
+            </button>
+          </div>
           <button
-            onClick={copyCode}
-            className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] transition-colors cursor-pointer bg-transparent border-none"
+            onClick={() => onGoToDraft(membership)}
+            className="bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[13px] font-medium uppercase tracking-[0.08em] cursor-pointer shrink-0"
           >
-            {copied ? 'Copied!' : 'Copy'}
+            Draft room
           </button>
         </div>
         <button
-          onClick={() => onGoToDraft(membership)}
-          className="bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[13px] font-medium uppercase tracking-[0.08em] cursor-pointer shrink-0"
+          onClick={copyLink}
+          className="w-full bg-white rounded-lg px-4 py-3 text-[13px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] transition-colors cursor-pointer text-left"
         >
-          Draft room
+          {copiedLink ? 'Link copied!' : `Copy invite link → ${inviteUrl}`}
         </button>
       </div>
     </div>
