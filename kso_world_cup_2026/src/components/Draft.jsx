@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { TEAMS } from '../data/teams'
+import Preferences from './Preferences'
 
 const MULTIPLIER_LABEL = { top: '×1', mid: '×2', bottom: '×3' }
 
@@ -70,13 +71,15 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
           Waiting for the commissioner to start the draft…
         </p>
       )}
+
+      <Preferences membership={membership} />
     </div>
   )
 }
 
 // ── Draft board ───────────────────────────────────────────────────────────────
 
-function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf }) {
+function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf, onAutoDraft }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
   const pickedTeams = Object.fromEntries(picks.map(p => [p.team_id, p]))
 
@@ -151,6 +154,14 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
                 }`}
               >
                 {pickingOnBehalf ? 'Cancel' : `Pick for ${currentMember?.display_name ?? '…'}`}
+              </button>
+            )}
+            {!isPaused && (
+              <button
+                onClick={onAutoDraft}
+                className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
+              >
+                Auto-draft {currentMember?.display_name ?? '…'}
               </button>
             )}
           </div>
@@ -259,6 +270,9 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
           </div>
         </div>
       )}
+
+      {/* My preferences */}
+      <Preferences membership={membership} pickedTeamIds={picks.map(p => p.team_id)} />
     </div>
   )
 }
@@ -348,6 +362,14 @@ export default function Draft({ context }) {
     })
     if (error) setPickError(error.message)
     else setPickingOnBehalf(false)
+    setPicking(false)
+  }
+
+  async function handleAutoDraft() {
+    setPicking(true)
+    setPickError(null)
+    const { error } = await supabase.rpc('auto_draft', { p_draft_session_id: draftSession.id })
+    if (error) setPickError(error.message)
     setPicking(false)
   }
 
@@ -446,6 +468,7 @@ export default function Draft({ context }) {
       onCommissionerPick={handleCommissionerPick}
       pickingOnBehalf={pickingOnBehalf}
       onTogglePickOnBehalf={() => setPickingOnBehalf(p => !p)}
+      onAutoDraft={handleAutoDraft}
     />
   )
 }
