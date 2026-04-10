@@ -10,27 +10,27 @@ import Login from './components/Login'
 import GroupFlow from './components/GroupFlow'
 import Draft from './components/Draft'
 
+// Capture auth callback params before Supabase cleans the URL.
+// PKCE flow uses ?code=, implicit flow uses #access_token=
+const params = new URLSearchParams(window.location.search)
+const isAuthCallback =
+  params.has('code') ||
+  window.location.hash.includes('access_token')
+
+// Capture invite code before Supabase strips query params
+const initialInviteCode = params.get('invite')
+
 export default function App() {
   const [activeTab, setActiveTab] = useState(null)
   const [session, setSession] = useState(undefined) // undefined = loading, null = logged out
   const [context, setContext] = useState(null)       // { group, membership } once ready
-  const [inviteCode, setInviteCode] = useState(null)
-
-  // Pick up ?invite=CODE from URL (set before auth so it survives the magic link redirect)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('invite')
-    if (code) setInviteCode(code)
-  }, [])
+  const [inviteCode] = useState(initialInviteCode)
 
   // Listen for auth state changes
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
-      // If arriving via magic link (Supabase puts tokens in the URL hash), go to draft
-      if (data.session && window.location.hash.includes('access_token')) {
-        setActiveTab('draft')
-      }
+      if (data.session && isAuthCallback) setActiveTab('draft')
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)

@@ -5,6 +5,42 @@ import Preferences from './Preferences'
 
 const MULTIPLIER_LABEL = { top: '×1', mid: '×2', bottom: '×3' }
 
+const TIMEOUT_OPTIONS = [
+  { label: '60 seconds', value: 60 },
+  { label: '90 seconds', value: 90 },
+  { label: '2 minutes', value: 120 },
+  { label: '5 minutes', value: 300 },
+  { label: 'No limit', value: 0 },
+]
+
+// ── Countdown timer hook ──────────────────────────────────────────────────────
+
+function useCountdown(deadline) {
+  const [secondsLeft, setSecondsLeft] = useState(null)
+
+  useEffect(() => {
+    if (!deadline) { setSecondsLeft(null); return }
+
+    function tick() {
+      const diff = Math.ceil((new Date(deadline) - new Date()) / 1000)
+      setSecondsLeft(Math.max(0, diff))
+    }
+
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [deadline])
+
+  return secondsLeft
+}
+
+function formatCountdown(seconds) {
+  if (seconds === null) return null
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`
+}
+
 // ── Snake order generator ─────────────────────────────────────────────────────
 
 function generateSnakeOrder(memberIds, totalPicks) {
@@ -23,7 +59,7 @@ function generateSnakeOrder(memberIds, totalPicks) {
 
 // ── Waiting room ──────────────────────────────────────────────────────────────
 
-function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft, starting, error }) {
+function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft, starting, error, timeoutSeconds, onTimeoutChange }) {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
@@ -57,6 +93,20 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
           <p className="text-[14px] text-[#0a0a0a]/50">
             When everyone has joined, start the draft. Pick order will be randomly assigned as a snake draft.
           </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
+              Time per pick
+            </p>
+            <select
+              value={timeoutSeconds}
+              onChange={e => onTimeoutChange(Number(e.target.value))}
+              className="bg-[#e9e9e9] rounded-lg px-4 py-3 text-[16px] text-[#0a0a0a] outline-none cursor-pointer"
+            >
+              {TIMEOUT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
           {error && <p className="text-red-500 text-[14px]">{error}</p>}
           <button
             onClick={onStartDraft}
@@ -89,6 +139,10 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
   const isPaused = draftSession.status === 'paused'
   const isDone = draftSession.status === 'complete' || draftSession.current_pick_number > TEAMS.length
 
+  const secondsLeft = useCountdown(draftSession.pick_deadline)
+  const countdown = formatCountdown(secondsLeft)
+  const isUrgent = secondsLeft !== null && secondsLeft <= 15
+
   const sortedTeams = [...TEAMS].sort((a, b) => a.fifaRank - b.fifaRank)
   const recentPicks = [...picks].reverse().slice(0, 10)
 
@@ -110,6 +164,11 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
             {picks.length} teams drafted
             {' · '}
             {TEAMS.length - picks.length} remaining
+          </p>
+        )}
+        {!isDone && countdown && !isPaused && (
+          <p className={`text-[40px] sm:text-[56px] font-semibold leading-none tabular-nums ${isUrgent ? 'text-red-500' : 'text-[#0a0a0a]/20'}`}>
+            {countdown}
           </p>
         )}
         {isPaused && <p className="text-[16px] text-[#0a0a0a]/50">Draft is paused.</p>}
@@ -292,6 +351,7 @@ export default function Draft({ context }) {
   const [picking, setPicking] = useState(false)
   const [pickError, setPickError] = useState(null)
   const [pickingOnBehalf, setPickingOnBehalf] = useState(false)
+  const [timeoutSeconds, setTimeoutSeconds] = useState(90)
   const [error, setError] = useState(null)
 
   // Load initial data
@@ -374,11 +434,18 @@ export default function Draft({ context }) {
   }
 
   async function handlePause() {
-    await supabase.from('draft_session').update({ status: 'paused' }).eq('id', draftSession.id)
+    await supabase.from('draft_session')
+      .update({ status: 'paused', pick_deadline: null })
+      .eq('id', draftSession.id)
   }
 
   async function handleResume() {
-    await supabase.from('draft_session').update({ status: 'active' }).eq('id', draftSession.id)
+    const pick_deadline = draftSession.pick_timeout_seconds > 0
+      ? new Date(Date.now() + draftSession.pick_timeout_seconds * 1000).toISOString()
+      : null
+    await supabase.from('draft_session')
+      .update({ status: 'active', pick_deadline })
+      .eq('id', draftSession.id)
   }
 
   async function handleUndo() {
@@ -403,9 +470,13 @@ export default function Draft({ context }) {
     const memberIds = members.map(m => m.id)
     const snakeOrder = generateSnakeOrder(memberIds, TEAMS.length)
 
+    const pick_deadline = timeoutSeconds > 0
+      ? new Date(Date.now() + timeoutSeconds * 1000).toISOString()
+      : null
+
     const { data: session, error: sessionError } = await supabase
       .from('draft_session')
-      .insert({ group_id: group.id, status: 'active', current_pick_number: 1 })
+      .insert({ group_id: group.id, status: 'active', current_pick_number: 1, pick_timeout_seconds: timeoutSeconds, pick_deadline })
       .select()
       .single()
 
@@ -446,6 +517,8 @@ export default function Draft({ context }) {
         onStartDraft={handleStartDraft}
         starting={starting}
         error={error}
+        timeoutSeconds={timeoutSeconds}
+        onTimeoutChange={setTimeoutSeconds}
       />
     )
   }
