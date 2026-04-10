@@ -76,13 +76,14 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
 
 // ── Draft board ───────────────────────────────────────────────────────────────
 
-function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError }) {
+function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
   const pickedTeams = Object.fromEntries(picks.map(p => [p.team_id, p]))
 
   const currentOrderEntry = draftOrder[draftSession.current_pick_number - 1]
   const currentMember = currentOrderEntry ? memberMap[currentOrderEntry.group_member_id] : null
   const isMyTurn = currentMember?.id === membership.id
+  const isPaused = draftSession.status === 'paused'
   const isDone = draftSession.status === 'complete' || draftSession.current_pick_number > TEAMS.length
 
   const sortedTeams = [...TEAMS].sort((a, b) => a.fifaRank - b.fifaRank)
@@ -108,11 +109,53 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
             {TEAMS.length - picks.length} remaining
           </p>
         )}
-        {isMyTurn && !isDone && (
+        {isPaused && <p className="text-[16px] text-[#0a0a0a]/50">Draft is paused.</p>}
+        {!isPaused && isMyTurn && !isDone && (
           <p className="text-[16px] text-[#0a0a0a]">Click a team below to make your pick.</p>
+        )}
+        {!isPaused && pickingOnBehalf && !isDone && (
+          <p className="text-[16px] text-[#0a0a0a]">
+            Picking on behalf of <span className="font-semibold">{currentMember?.display_name}</span> — click a team.
+          </p>
         )}
         {pickError && <p className="text-red-500 text-[14px]">{pickError}</p>}
       </div>
+
+      {/* Commissioner controls */}
+      {isCommissioner && !isDone && (
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
+            Commissioner
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={isPaused ? onResume : onPause}
+              className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
+            >
+              {isPaused ? 'Resume draft' : 'Pause draft'}
+            </button>
+            <button
+              onClick={onUndo}
+              disabled={picks.length === 0}
+              className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors disabled:opacity-40"
+            >
+              Undo last pick
+            </button>
+            {!isMyTurn && !isPaused && (
+              <button
+                onClick={onTogglePickOnBehalf}
+                className={`rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer transition-colors ${
+                  pickingOnBehalf
+                    ? 'bg-[#0a0a0a] text-white'
+                    : 'bg-[#e9e9e9] hover:bg-[#d8d8d8]'
+                }`}
+              >
+                {pickingOnBehalf ? 'Cancel' : `Pick for ${currentMember?.display_name ?? '…'}`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Pick order — next 5 picks */}
       {!isDone && (
@@ -152,12 +195,17 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
             const pick = pickedTeams[team.id]
             const picker = pick ? memberMap[pick.group_member_id] : null
             const isPicked = !!pick
-            const isClickable = isMyTurn && !isPicked && !isDone && !picking
+            const isClickable = !isPicked && !isDone && !picking && !isPaused &&
+              (isMyTurn || pickingOnBehalf)
+            const handleClick = () => {
+              if (!isClickable) return
+              pickingOnBehalf ? onCommissionerPick(team.id) : onPick(team.id)
+            }
 
             return (
               <div
                 key={team.id}
-                onClick={() => isClickable && onPick(team.id)}
+                onClick={handleClick}
                 className={`rounded-[4px] p-2 flex items-center justify-between h-14 transition-all ${
                   isPicked
                     ? 'bg-[#e9e9e9] opacity-40'
@@ -229,6 +277,7 @@ export default function Draft({ context }) {
   const [starting, setStarting] = useState(false)
   const [picking, setPicking] = useState(false)
   const [pickError, setPickError] = useState(null)
+  const [pickingOnBehalf, setPickingOnBehalf] = useState(false)
   const [error, setError] = useState(null)
 
   // Load initial data
@@ -288,6 +337,41 @@ export default function Draft({ context }) {
     })
     if (error) setPickError(error.message)
     setPicking(false)
+  }
+
+  async function handleCommissionerPick(teamId) {
+    setPicking(true)
+    setPickError(null)
+    const { error } = await supabase.rpc('commissioner_pick', {
+      p_draft_session_id: draftSession.id,
+      p_team_id: teamId,
+    })
+    if (error) setPickError(error.message)
+    else setPickingOnBehalf(false)
+    setPicking(false)
+  }
+
+  async function handlePause() {
+    await supabase.from('draft_session').update({ status: 'paused' }).eq('id', draftSession.id)
+  }
+
+  async function handleResume() {
+    await supabase.from('draft_session').update({ status: 'active' }).eq('id', draftSession.id)
+  }
+
+  async function handleUndo() {
+    const { error } = await supabase.rpc('undo_pick', { p_draft_session_id: draftSession.id })
+    if (error) {
+      setPickError(error.message)
+    } else {
+      setPickingOnBehalf(false)
+      const { data } = await supabase
+        .from('draft_picks')
+        .select()
+        .eq('draft_session_id', draftSession.id)
+        .order('pick_number')
+      if (data) setPicks(data)
+    }
   }
 
   async function handleStartDraft() {
@@ -355,6 +439,13 @@ export default function Draft({ context }) {
       onPick={handlePick}
       picking={picking}
       pickError={pickError}
+      isCommissioner={isCommissioner}
+      onPause={handlePause}
+      onResume={handleResume}
+      onUndo={handleUndo}
+      onCommissionerPick={handleCommissionerPick}
+      pickingOnBehalf={pickingOnBehalf}
+      onTogglePickOnBehalf={() => setPickingOnBehalf(p => !p)}
     />
   )
 }
