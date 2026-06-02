@@ -84,6 +84,7 @@ export function EditNameModal({ currentName, onDone, onClose }) {
 
 export function JoinLeagueModal({ user, displayName, onDone, onClose }) {
   const [code, setCode] = useState('')
+  const [name, setName] = useState(displayName || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -104,17 +105,16 @@ export function JoinLeagueModal({ user, displayName, onDone, onClose }) {
       return
     }
 
-    const name = displayName || user.email.split('@')[0]
     const { data: membership, error: memberError } = await supabase
       .from('group_members')
-      .insert({ group_id: group.id, user_id: user.id, display_name: name })
+      .insert({ group_id: group.id, user_id: user.id, display_name: name.trim() })
       .select('*, groups(*)')
       .single()
 
     if (memberError) {
       setError(
         memberError.code === '23505'
-          ? 'You\'re already in this group.'
+          ? 'That name is already taken in this league — try a different one.'
           : memberError.message
       )
       setLoading(false)
@@ -145,10 +145,18 @@ export function JoinLeagueModal({ user, displayName, onDone, onClose }) {
             autoFocus
             className="bg-[#e9e9e9] rounded-lg px-4 py-3 text-[16px] text-[#0a0a0a] placeholder:text-[#0a0a0a]/40 outline-none focus:ring-2 focus:ring-[#0a0a0a]/20 tracking-wider"
           />
+          <input
+            type="text"
+            placeholder="Your name in this league"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            required
+            className="bg-[#e9e9e9] rounded-lg px-4 py-3 text-[16px] text-[#0a0a0a] placeholder:text-[#0a0a0a]/40 outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
+          />
           {error && <p className="text-red-500 text-[14px]">{error}</p>}
           <button
             type="submit"
-            disabled={loading || !code.trim()}
+            disabled={loading || !code.trim() || !name.trim()}
             className="bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer disabled:opacity-40"
           >
             {loading ? 'Joining…' : 'Join league'}

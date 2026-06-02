@@ -57,6 +57,22 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Auto-load context when session is available and user has memberships
+  useEffect(() => {
+    if (!session || context) return
+    supabase
+      .from('group_members')
+      .select('*, groups(*)')
+      .eq('user_id', session.user.id)
+      .order('joined_at')
+      .then(({ data }) => {
+        if (data?.length === 1) {
+          setContext({ group: data[0].groups, membership: data[0] })
+        }
+        // Multiple leagues: leave context null — user picks via My Leagues
+      })
+  }, [session?.user?.id])
+
   const displayName =
     session?.user?.user_metadata?.display_name ||
     context?.membership?.display_name ||

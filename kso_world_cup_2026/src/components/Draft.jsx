@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { TEAMS } from '../data/teams'
 import { TEAM_GROUPS } from '../data/teamGroups'
 import Preferences from './Preferences'
+import { ModalShell } from './AccountModals'
 import {
   DUMMY_DRAFT_PLAYERS,
   DUMMY_DRAFT_ORDER,
@@ -10,7 +11,7 @@ import {
   DUMMY_DRAFT_SESSION,
 } from '../data/dummyFixtures'
 
-const USE_DUMMY = true // set to false to use live Supabase data
+const USE_DUMMY = false // set to true to use dummy data for UI testing
 
 const MULTIPLIER_LABEL = { top: '×1', upper: '×2', lower: '×3', bottom: '×4' }
 
@@ -53,6 +54,12 @@ function formatCountdown(seconds) {
 // ── Snake order generator ─────────────────────────────────────────────────────
 
 function generateSnakeOrder(memberIds, totalPicks) {
+  if (memberIds.length === 0) {
+    throw new Error('Cannot start a draft with no players.')
+  }
+  if (new Set(memberIds).size !== memberIds.length) {
+    throw new Error('Duplicate players detected — refresh and try again before starting.')
+  }
   const order = []
   let round = 0
   while (order.length < totalPicks) {
@@ -69,6 +76,14 @@ function generateSnakeOrder(memberIds, totalPicks) {
 // ── Waiting room ──────────────────────────────────────────────────────────────
 
 function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft, starting, error, timeoutSeconds, onTimeoutChange }) {
+  const [expectedCount, setExpectedCount] = useState('')
+  const [confirming, setConfirming] = useState(false)
+
+  const expected = Number(expectedCount)
+  const expectedValid = Number.isInteger(expected) && expected >= 2
+  const countMatches = expectedValid && members.length === expected
+  const tooMany = expectedValid && members.length > expected
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
@@ -100,8 +115,21 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
       {isCommissioner ? (
         <div className="flex flex-col gap-3 max-w-sm">
           <p className="text-[14px] text-[#0a0a0a]/50">
-            When everyone has joined, start the draft. Pick order will be randomly assigned as a snake draft.
+            When everyone has joined, start the draft. Pick order is assigned as a snake draft. <span className="text-[#0a0a0a]/70">No one can join after the draft starts.</span>
           </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
+              Expected number of players
+            </p>
+            <input
+              type="number"
+              min="2"
+              placeholder="e.g. 24"
+              value={expectedCount}
+              onChange={e => { setExpectedCount(e.target.value); setConfirming(false) }}
+              className="bg-[#e9e9e9] rounded-lg px-4 py-3 text-[16px] text-[#0a0a0a] placeholder:text-[#0a0a0a]/40 outline-none"
+            />
+          </div>
           <div className="flex flex-col gap-1">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
               Time per pick
@@ -116,14 +144,48 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
               ))}
             </select>
           </div>
+
+          {expectedValid && !countMatches && (
+            <p className="text-[14px] text-[#0a0a0a]/50">
+              {tooMany
+                ? `${members.length} players have joined but you expected ${expected}. Check the list above before starting.`
+                : `Waiting for ${expected - members.length} more ${expected - members.length === 1 ? 'player' : 'players'} (${members.length}/${expected} joined).`}
+            </p>
+          )}
+
           {error && <p className="text-red-500 text-[14px]">{error}</p>}
-          <button
-            onClick={onStartDraft}
-            disabled={starting || members.length < 1}
-            className="bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer disabled:opacity-40"
-          >
-            {starting ? 'Starting…' : 'Start draft'}
-          </button>
+
+          {!confirming ? (
+            <button
+              onClick={() => setConfirming(true)}
+              disabled={starting || !countMatches}
+              className="bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer disabled:opacity-40"
+            >
+              Start draft
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2 bg-[#f7f7f7] rounded-lg p-4">
+              <p className="text-[14px] text-[#0a0a0a]">
+                Start the draft with <span className="font-semibold">{members.length} players</span>? No one can join after this.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={onStartDraft}
+                  disabled={starting}
+                  className="bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer disabled:opacity-40"
+                >
+                  {starting ? 'Starting…' : 'Yes, start draft'}
+                </button>
+                <button
+                  onClick={() => setConfirming(false)}
+                  disabled={starting}
+                  className="text-[14px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] bg-transparent border-none cursor-pointer px-4"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <p className="text-[#0a0a0a]/50 text-[16px]">
@@ -171,6 +233,7 @@ function EmptySlot() {
 
 function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf, onAutoDraft }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
+  const [pendingPick, setPendingPick] = useState(null) // { team, onBehalf }
 
   const currentOrderEntry = draftOrder[draftSession.current_pick_number - 1]
   const currentMember = currentOrderEntry ? memberMap[currentOrderEntry.group_member_id] : null
@@ -182,11 +245,19 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
   const countdown = formatCountdown(secondsLeft)
   const isUrgent = secondsLeft !== null && secondsLeft <= 15
 
-  // Build picks lookup: member id → [team, team]
+  // Build picks lookup: member id → [team, team, …]
   const picksByMember = {}
   picks.forEach(pick => {
     if (!picksByMember[pick.group_member_id]) picksByMember[pick.group_member_id] = []
     picksByMember[pick.group_member_id].push(pick)
+  })
+
+  // How many picks each player gets, derived from the snake order. With 48
+  // teams and N players this is usually 48/N, but when N doesn't divide 48
+  // some players get one extra — draft_order is the source of truth.
+  const slotsByMember = {}
+  draftOrder.forEach(entry => {
+    slotsByMember[entry.group_member_id] = (slotsByMember[entry.group_member_id] || 0) + 1
   })
 
   // Members in round-1 pick order (first N entries of draftOrder)
@@ -281,25 +352,23 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
 
         {/* ── Left: player list ─────────────────────────────────────────── */}
         <div className="lg:w-[55%] flex flex-col">
-          <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_1fr_1fr] gap-x-2 gap-y-1 items-center mb-2">
+          <div className="grid grid-cols-[1.5rem_minmax(0,9rem)_1fr] gap-x-2 gap-y-1 items-center mb-2">
             <span />
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">Player</p>
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">Pick 1</p>
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">Pick 2</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">Picks</p>
           </div>
 
           <div className="flex flex-col gap-1">
             {membersInOrder.map((member, i) => {
               const memberPicks = picksByMember[member.id] || []
-              const team1 = memberPicks[0] ? TEAMS.find(t => t.id === memberPicks[0].team_id) : null
-              const team2 = memberPicks[1] ? TEAMS.find(t => t.id === memberPicks[1].team_id) : null
+              const slotCount = slotsByMember[member.id] || 0
               const isCurrentPicker = member.id === currentMember?.id
               const isMe = member.id === membership.id
 
               return (
                 <div
                   key={member.id}
-                  className={`grid grid-cols-[1.5rem_minmax(0,1fr)_1fr_1fr] gap-x-2 items-start rounded-lg px-1 py-1 ${
+                  className={`grid grid-cols-[1.5rem_minmax(0,9rem)_1fr] gap-x-2 items-start rounded-lg px-1 py-1 ${
                     isCurrentPicker ? 'bg-[#f7f7f7]' : ''
                   }`}
                 >
@@ -319,11 +388,16 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
                     )}
                   </div>
 
-                  {/* Pick slot 1 */}
-                  {team1 ? <TeamCard team={team1} /> : <EmptySlot />}
-
-                  {/* Pick slot 2 */}
-                  {team2 ? <TeamCard team={team2} /> : <EmptySlot />}
+                  {/* Pick slots — one per pick this player gets in the snake order */}
+                  <div className="grid gap-1 [grid-template-columns:repeat(auto-fill,minmax(90px,1fr))]">
+                    {Array.from({ length: slotCount }).map((_, slot) => {
+                      const pick = memberPicks[slot]
+                      const team = pick ? TEAMS.find(t => t.id === pick.team_id) : null
+                      return team
+                        ? <TeamCard key={slot} team={team} />
+                        : <EmptySlot key={slot} />
+                    })}
+                  </div>
                 </div>
               )
             })}
@@ -346,7 +420,7 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
                   isClickable={canPick}
                   onClick={() => {
                     if (!canPick) return
-                    pickingOnBehalf ? onCommissionerPick(team.id) : onPick(team.id)
+                    setPendingPick({ team, onBehalf: pickingOnBehalf })
                   }}
                 />
               ))}
@@ -355,6 +429,56 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
         </div>
 
       </div>
+
+      {/* Confirm pick modal */}
+      {pendingPick && (
+        <ModalShell onClose={() => setPendingPick(null)}>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <p className="text-[26px] font-semibold leading-[1.1] tracking-[-0.02em]">
+                Confirm pick
+              </p>
+              <p className="text-[#0a0a0a]/50 text-[15px]">
+                {pendingPick.onBehalf
+                  ? `Pick this team for ${currentMember?.display_name}?`
+                  : 'This pick is final and can’t be changed.'}
+              </p>
+            </div>
+
+            <div className="bg-[#f7f7f7] rounded-xl p-4 flex items-center gap-3">
+              <span className="text-[40px] leading-none">{pendingPick.team.flag}</span>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <p className="text-[18px] font-semibold leading-tight truncate">{pendingPick.team.name}</p>
+                <p className="text-[12px] text-[#0a0a0a]/50">
+                  {TEAM_GROUPS[pendingPick.team.name] ? `Group ${TEAM_GROUPS[pendingPick.team.name]}` : '—'}
+                  {' · '}#{pendingPick.team.fifaRank} · {MULTIPLIER_LABEL[pendingPick.team.tier]}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const { team, onBehalf } = pendingPick
+                  onBehalf ? onCommissionerPick(team.id) : onPick(team.id)
+                  setPendingPick(null)
+                }}
+                disabled={picking}
+                className="flex-1 bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer disabled:opacity-40"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setPendingPick(null)}
+                disabled={picking}
+                className="text-[14px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] bg-transparent border-none cursor-pointer px-4"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
     </div>
   )
 }
@@ -415,6 +539,44 @@ export default function Draft({ context }) {
     }
     load()
   }, [group.id])
+
+  // Listen for the draft starting while sitting in the waiting room.
+  // The commissioner INSERTs a draft_session row; everyone else needs to
+  // pick that up live instead of having to refresh.
+  useEffect(() => {
+    if (draftSession || USE_DUMMY) return
+
+    const channel = supabase
+      .channel(`draft-start-${group.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'draft_session',
+        filter: `group_id=eq.${group.id}`,
+      }, async payload => {
+        const session = payload.new
+        // draft_order is inserted immediately after the session row; give it a
+        // beat and refetch if it isn't visible yet.
+        async function loadOrder() {
+          const [orderRes, picksRes] = await Promise.all([
+            supabase.from('draft_order').select().eq('draft_session_id', session.id).order('pick_number'),
+            supabase.from('draft_picks').select().eq('draft_session_id', session.id).order('pick_number'),
+          ])
+          return { order: orderRes.data || [], picks: picksRes.data || [] }
+        }
+        let { order, picks: sessionPicks } = await loadOrder()
+        if (order.length === 0) {
+          await new Promise(r => setTimeout(r, 600))
+          ;({ order, picks: sessionPicks } = await loadOrder())
+        }
+        setDraftOrder(order)
+        setPicks(sessionPicks)
+        setDraftSession(session)
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [group.id, draftSession?.id])
 
   // Real-time subscriptions
   useEffect(() => {
@@ -505,7 +667,14 @@ export default function Draft({ context }) {
     setError(null)
 
     const memberIds = members.map(m => m.id)
-    const snakeOrder = generateSnakeOrder(memberIds, TEAMS.length)
+    let snakeOrder
+    try {
+      snakeOrder = generateSnakeOrder(memberIds, TEAMS.length)
+    } catch (e) {
+      setError(e.message)
+      setStarting(false)
+      return
+    }
 
     const pick_deadline = timeoutSeconds > 0
       ? new Date(Date.now() + timeoutSeconds * 1000).toISOString()
