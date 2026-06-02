@@ -118,11 +118,12 @@ Unique: `(draft_session_id, pick_number)`, `(draft_session_id, team_id)`
 Unique: `(group_member_id, team_id)`, `(group_member_id, rank)`
 
 ## Supabase Postgres functions (security definer)
-The league-management + reset functions are version-controlled in `supabase/functions.sql` — paste it into the Supabase SQL Editor to (re)install them. The draft-pick functions (`make_pick`/`commissioner_pick`/`undo_pick`/`auto_draft`) were created earlier in the dashboard and are not yet in that file.
+All functions are version-controlled in `supabase/functions.sql` (dependency-ordered) — paste the whole file into the Supabase SQL Editor to (re)install everything from scratch.
 - `make_pick(p_draft_session_id, p_team_id)` — validates turn, inserts pick, advances pick number
 - `commissioner_pick(p_draft_session_id, p_team_id)` — same but commissioner picks on behalf of current player
 - `undo_pick(p_draft_session_id)` — deletes last pick, rewinds pick number
-- `auto_draft(p_draft_session_id)` — picks current player's highest-ranked available team from their preferences (falls back to FIFA rank order)
+- `auto_draft(p_draft_session_id)` — commissioner-only; delegates to `auto_draft_for_session`
+- `auto_draft_for_session(p_draft_session_id)` — picks current player's highest-ranked available team from preferences (falls back to lowest available team id 1–48)
 - `reset_draft(p_group_id)` — commissioner-only; deletes all picks/order/session for the league (back to waiting room)
 - `leave_league(p_group_id)` — leave a league you're in; blocked once a draft_session exists; commissioner must transfer/delete first
 - `remove_member(p_group_id, p_member_id)` — commissioner-only; remove a member before the draft starts
