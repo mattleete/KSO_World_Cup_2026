@@ -1,49 +1,49 @@
 const RULES = [
   {
-    heading: 'Draft',
-    body: 'Each player was assigned national teams via a snake draft. The first 8 players received 3 teams; the remaining 11 received 2 teams.',
+    heading: 'The draft',
+    body: '24 players each draft 2 national teams from the 48 FIFA World Cup squads via a snake draft — 48 picks in total. Pick order is randomly assigned when the draft begins, then reversed for round 2.',
   },
   {
     heading: 'Points per match',
-    body: 'Win: 2 pts · Draw: 1 pt · Loss: 0 pts\nBonus: +1 pt if your team wins by 2 or more goals.',
+    body: 'Win: 2 pts\nDraw: 1 pt\nLoss: 0 pts\nBonus: +1 pt if your team wins by 2 or more goals',
   },
   {
     heading: 'Multipliers',
-    body: 'Top 16 teams (FIFA rank 1–16): ×1\nMiddle 16 teams (FIFA rank 17–32): ×2\nBottom 16 teams (FIFA rank 33–48): ×3',
+    body: 'Points are multiplied based on FIFA ranking at the time of the draft:\n\nTop 12 (rank 1–12): ×1\nUpper 12 (rank 13–24): ×2\nLower 12 (rank 25–36): ×3\nBottom 12 (rank 37–48): ×4',
   },
   {
     heading: 'Formula',
-    body: 'Points = (base + bonus) × multiplier',
+    body: '(base points + bonus) × multiplier',
+  },
+  {
+    heading: 'Example',
+    body: 'Australia (rank 25, ×3) beats Brazil 2–0:\nBase 2 pts + bonus 1 pt = 3 × 3 = 9 pts\n\nArgentina (rank 1, ×1) beats Australia 2–0:\nBase 2 pts + bonus 1 pt = 3 × 1 = 3 pts',
   },
   {
     heading: 'Winner',
-    body: 'The KSO player with the most points when the World Cup final is played wins.',
+    body: 'The player with the most total points when the World Cup final is played wins.',
   },
 ]
 
 export default function Rules() {
   return (
     <div>
-      {/* Hero */}
       <div className="py-16 lg:py-[91px]">
         <h1
           className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
           style={{ letterSpacing: '-2.88px' }}
         >
-          Rules are important
+          Rules
         </h1>
       </div>
 
-      {/* Rules content */}
-      <div className="pb-16 flex flex-col gap-8 max-w-3xl">
+      <div className="pb-16 flex flex-col gap-10 max-w-2xl">
         {RULES.map(rule => (
-          <div key={rule.heading} className="flex flex-col gap-2">
+          <div key={rule.heading} className="flex flex-col gap-3">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
               {rule.heading}
             </p>
-            <p
-              className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] whitespace-pre-line"
-            >
+            <p className="text-[20px] font-semibold leading-[1.3] tracking-[-0.01em] whitespace-pre-line">
               {rule.body}
             </p>
           </div>

@@ -12,7 +12,7 @@ import {
 
 const USE_DUMMY = true // set to false to use live Supabase data
 
-const MULTIPLIER_LABEL = { top: '×1', mid: '×2', bottom: '×3' }
+const MULTIPLIER_LABEL = { top: '×1', upper: '×2', lower: '×3', bottom: '×4' }
 
 const TIMEOUT_OPTIONS = [
   { label: '60 seconds', value: 60 },
