@@ -231,9 +231,11 @@ function EmptySlot() {
 
 // ── Draft board ───────────────────────────────────────────────────────────────
 
-function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf, onAutoDraft }) {
+function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf, onAutoDraft, onResetTimer, onResetDraft }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
   const [pendingPick, setPendingPick] = useState(null) // { team, onBehalf }
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const currentOrderEntry = draftOrder[draftSession.current_pick_number - 1]
   const currentMember = currentOrderEntry ? memberMap[currentOrderEntry.group_member_id] : null
@@ -311,39 +313,57 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
       </div>
 
       {/* Commissioner controls */}
-      {isCommissioner && !isDone && (
+      {isCommissioner && (
         <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={isPaused ? onResume : onPause}
-            className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
-          >
-            {isPaused ? 'Resume' : 'Pause'}
-          </button>
-          <button
-            onClick={onUndo}
-            disabled={picks.length === 0}
-            className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors disabled:opacity-40"
-          >
-            Undo
-          </button>
-          {!isMyTurn && !isPaused && (
-            <button
-              onClick={onTogglePickOnBehalf}
-              className={`rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer transition-colors ${
-                pickingOnBehalf ? 'bg-[#0a0a0a] text-white' : 'bg-[#e9e9e9] hover:bg-[#d8d8d8]'
-              }`}
-            >
-              {pickingOnBehalf ? 'Cancel' : `Pick for ${currentMember?.display_name ?? '…'}`}
-            </button>
+          {!isDone && (
+            <>
+              <button
+                onClick={isPaused ? onResume : onPause}
+                className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
+              >
+                {isPaused ? 'Resume' : 'Pause'}
+              </button>
+              <button
+                onClick={onUndo}
+                disabled={picks.length === 0}
+                className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors disabled:opacity-40"
+              >
+                Undo
+              </button>
+              {!isMyTurn && !isPaused && (
+                <button
+                  onClick={onTogglePickOnBehalf}
+                  className={`rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer transition-colors ${
+                    pickingOnBehalf ? 'bg-[#0a0a0a] text-white' : 'bg-[#e9e9e9] hover:bg-[#d8d8d8]'
+                  }`}
+                >
+                  {pickingOnBehalf ? 'Cancel' : `Pick for ${currentMember?.display_name ?? '…'}`}
+                </button>
+              )}
+              {!isPaused && (
+                <button
+                  onClick={onAutoDraft}
+                  className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
+                >
+                  Auto-draft
+                </button>
+              )}
+              {!isPaused && draftSession.pick_timeout_seconds > 0 && (
+                <button
+                  onClick={onResetTimer}
+                  className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
+                >
+                  Reset timer
+                </button>
+              )}
+            </>
           )}
-          {!isPaused && (
-            <button
-              onClick={onAutoDraft}
-              className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
-            >
-              Auto-draft
-            </button>
-          )}
+          <button
+            onClick={() => setConfirmingReset(true)}
+            className="bg-red-50 text-red-600 rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-red-100 transition-colors"
+          >
+            Reset draft
+          </button>
         </div>
       )}
 
@@ -479,6 +499,45 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
           </div>
         </ModalShell>
       )}
+
+      {/* Confirm reset draft modal */}
+      {confirmingReset && (
+        <ModalShell onClose={() => !resetting && setConfirmingReset(false)}>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <p className="text-[26px] font-semibold leading-[1.1] tracking-[-0.02em]">
+                Reset the draft?
+              </p>
+              <p className="text-[#0a0a0a]/50 text-[15px]">
+                This permanently deletes every pick and the pick order, and sends
+                everyone back to the waiting room. This can’t be undone.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  setResetting(true)
+                  await onResetDraft()
+                  setResetting(false)
+                  setConfirmingReset(false)
+                }}
+                disabled={resetting}
+                className="flex-1 bg-red-600 text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer disabled:opacity-40"
+              >
+                {resetting ? 'Resetting…' : 'Reset draft'}
+              </button>
+              <button
+                onClick={() => setConfirmingReset(false)}
+                disabled={resetting}
+                className="text-[14px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] bg-transparent border-none cursor-pointer px-4"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
     </div>
   )
 }
@@ -591,6 +650,17 @@ export default function Draft({ context }) {
         filter: `id=eq.${draftSession.id}`,
       }, payload => setDraftSession(payload.new))
       .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'draft_session',
+        filter: `id=eq.${draftSession.id}`,
+      }, () => {
+        // Commissioner reset the draft — return everyone to the waiting room.
+        setDraftSession(null)
+        setDraftOrder([])
+        setPicks([])
+      })
+      .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'draft_picks',
@@ -660,6 +730,30 @@ export default function Draft({ context }) {
         .order('pick_number')
       if (data) setPicks(data)
     }
+  }
+
+  async function handleResetTimer() {
+    if (!(draftSession.pick_timeout_seconds > 0)) return
+    const pick_deadline = new Date(Date.now() + draftSession.pick_timeout_seconds * 1000).toISOString()
+    const { error } = await supabase.from('draft_session')
+      .update({ pick_deadline })
+      .eq('id', draftSession.id)
+    if (error) setPickError(error.message)
+  }
+
+  async function handleResetDraft() {
+    setPickError(null)
+    const { error } = await supabase.rpc('reset_draft', { p_group_id: group.id })
+    if (error) {
+      setPickError(error.message)
+      return
+    }
+    // Locally drop back to the waiting room; other clients get the
+    // draft_session DELETE event.
+    setPickingOnBehalf(false)
+    setDraftSession(null)
+    setDraftOrder([])
+    setPicks([])
   }
 
   async function handleStartDraft() {
@@ -748,6 +842,8 @@ export default function Draft({ context }) {
       pickingOnBehalf={pickingOnBehalf}
       onTogglePickOnBehalf={() => setPickingOnBehalf(p => !p)}
       onAutoDraft={handleAutoDraft}
+      onResetTimer={handleResetTimer}
+      onResetDraft={handleResetDraft}
     />
   )
 }
