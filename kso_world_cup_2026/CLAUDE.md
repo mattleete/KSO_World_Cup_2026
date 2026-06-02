@@ -118,6 +118,7 @@ Unique: `(draft_session_id, pick_number)`, `(draft_session_id, team_id)`
 Unique: `(group_member_id, team_id)`, `(group_member_id, rank)`
 
 ## Supabase Postgres functions (security definer)
+The league-management + reset functions are version-controlled in `supabase/functions.sql` — paste it into the Supabase SQL Editor to (re)install them. The draft-pick functions (`make_pick`/`commissioner_pick`/`undo_pick`/`auto_draft`) were created earlier in the dashboard and are not yet in that file.
 - `make_pick(p_draft_session_id, p_team_id)` — validates turn, inserts pick, advances pick number
 - `commissioner_pick(p_draft_session_id, p_team_id)` — same but commissioner picks on behalf of current player
 - `undo_pick(p_draft_session_id)` — deletes last pick, rewinds pick number
