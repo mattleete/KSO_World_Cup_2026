@@ -1,7 +1,7 @@
 # KSO World Cup 2026 — Project Context
 
 ## What this is
-A fantasy World Cup tracker and live draft tool. Groups of friends each do a snake draft of the 48 World Cup teams, then earn points based on how their teams perform in the 2026 FIFA World Cup. Supports multiple independent groups. Live at: https://mattleete.github.io/KSO_World_Cup_2026/
+A fantasy World Cup tracker and live draft tool. Groups of friends each do a snake draft of the 48 World Cup teams, then earn points based on how their teams perform in the 2026 FIFA World Cup. Supports multiple independent groups. Live at: https://occypicks.com (GitHub Pages + custom domain; DNS via Cloudflare set to "DNS only" / grey cloud so GitHub can issue the TLS cert).
 
 ## Tech stack
 - React 19 + Vite 8
@@ -9,7 +9,7 @@ A fantasy World Cup tracker and live draft tool. Groups of friends each do a sna
 - Supabase (Auth, Postgres, Realtime)
 - @dnd-kit/core + @dnd-kit/sortable (drag-and-drop for preferences)
 - Deployed to GitHub Pages via `npm run deploy` (uses `gh-pages` package)
-- `vite.config.js` has `base: '/KSO_World_Cup_2026/'` for GitHub Pages
+- `vite.config.js` has `base: '/'` (custom domain serves from root); `public/CNAME` (occypicks.com) is baked into every build so the GitHub Pages custom domain survives each deploy
 - Font: Instrument Sans (Google Fonts, variable font, `font-variation-settings: "'wdth' 100"`)
 
 ## Key commands
