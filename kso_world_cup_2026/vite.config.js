@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/KSO_World_Cup_2026/',
+  base: '/', // custom domain occypicks.com serves from root
   plugins: [
     react(),
     tailwindcss(),
