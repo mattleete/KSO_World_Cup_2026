@@ -4,10 +4,10 @@ import { getTeamById, getTeamByName, getMultiplier } from '../data/teams'
  * Calculate points earned by one team from a single completed match.
  *
  * Scoring rules:
- *   Win:             2 pts
+ *   Win:             3 pts
  *   Draw:            1 pt
  *   Win by 2+ goals: +1 bonus pt
- *   Multiplier:      ×1 (top 16), ×2 (mid 16), ×3 (bottom 16)
+ *   Multiplier:      ×1 (rank 1–12), ×2 (13–24), ×3 (25–36), ×4 (37–48)
  *   Formula:         (base + bonus) × multiplier
  *
  * @param {string} teamName - Team name (must match teams.js `name` field)

@@ -5,7 +5,7 @@ import { getTeamByName, getTeamById } from '../data/teams'
 import { calcMatchPoints } from '../utils/scoring'
 import { DUMMY_FIXTURES, DUMMY_OWNERS } from '../data/dummyFixtures'
 
-const USE_DUMMY = true // set to false to use live API data
+const USE_DUMMY = false // set to true to use dummy data for UI testing
 
 function toAESTDateKey(dateStr) {
   if (!dateStr) return 'Date TBC'
@@ -37,11 +37,13 @@ function MatchCard({ match, ownerByTeamName }) {
   const isLive = match.status === 'live' || match.status === 'in_progress'
   const isComplete = hasScore && !isLive
 
+  // Always render a border so the live-game green border doesn't change the
+  // card's size relative to its neighbours in the grid.
   const cardClass = isLive
     ? 'bg-[#f7f7f7] border border-green-500'
     : isComplete
-      ? 'bg-[#e0e0e0]'
-      : 'bg-[#f7f7f7]'
+      ? 'bg-[#e0e0e0] border border-transparent'
+      : 'bg-[#f7f7f7] border border-transparent'
 
   const statusLabel = isLive
     ? `${match.stage ?? 'TBC'} · Live`
@@ -176,7 +178,7 @@ export default function Fixtures({ context }) {
   }, [context])
 
   const now = new Date()
-  const nextMatch = fixtures.find(m => !m.score1 && m.date && new Date(m.date) > now)
+  const nextMatch = fixtures.find(m => m.score1 == null && m.date && new Date(m.date) > now)
   const heroText = nextMatch
     ? `Next up: ${nextMatch.team1 ?? 'TBC'} vs ${nextMatch.team2 ?? 'TBC'}`
     : 'Fixtures'

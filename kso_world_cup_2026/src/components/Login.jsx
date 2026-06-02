@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function LoginModal({ inviteCode, onClose }) {
@@ -6,6 +6,14 @@ export default function LoginModal({ inviteCode, onClose }) {
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key === 'Escape') onClose?.()
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
 
   async function handleSubmit(e) {
     e.preventDefault()

@@ -76,8 +76,19 @@ function generateSnakeOrder(memberIds, totalPicks) {
 // ── Waiting room ──────────────────────────────────────────────────────────────
 
 function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft, starting, error, timeoutSeconds, onTimeoutChange }) {
-  const [expectedCount, setExpectedCount] = useState('')
+  // Persist the expected player count per league so a refresh mid-setup
+  // doesn't wipe it.
+  const storageKey = `kso-expected-count-${group.id}`
+  const [expectedCount, setExpectedCount] = useState(() => {
+    try { return localStorage.getItem(storageKey) || '' } catch { return '' }
+  })
   const [confirming, setConfirming] = useState(false)
+
+  function updateExpected(v) {
+    setExpectedCount(v)
+    setConfirming(false)
+    try { localStorage.setItem(storageKey, v) } catch { /* ignore */ }
+  }
 
   const expected = Number(expectedCount)
   const expectedValid = Number.isInteger(expected) && expected >= 2
@@ -126,7 +137,7 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
               min="2"
               placeholder="e.g. 24"
               value={expectedCount}
-              onChange={e => { setExpectedCount(e.target.value); setConfirming(false) }}
+              onChange={e => updateExpected(e.target.value)}
               className="bg-[#e9e9e9] rounded-lg px-4 py-3 text-[16px] text-[#0a0a0a] placeholder:text-[#0a0a0a]/40 outline-none"
             />
           </div>
@@ -205,9 +216,14 @@ function TeamCard({ team, isClickable, onClick }) {
   return (
     <div
       onClick={onClick}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? (e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() }
+      }) : undefined}
       className={`rounded-[6px] bg-[#f0f0f0] p-2 flex flex-col gap-0.5 transition-all ${
         isClickable
-          ? 'cursor-pointer hover:bg-[#e4e4e4] active:scale-[0.98]'
+          ? 'cursor-pointer hover:bg-[#e4e4e4] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/30'
           : ''
       }`}
     >

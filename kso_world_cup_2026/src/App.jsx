@@ -103,7 +103,13 @@ export default function App() {
           to see your picks and points.
         </p>
       )
-      return <PicksAndPoints context={context} />
+      return (
+        <PicksAndPoints
+          context={context}
+          onJoinLeague={() => setModal('joinLeague')}
+          onCreateLeague={() => setModal('createLeague')}
+        />
+      )
     }
 
     if (activeTab === 'fixtures') return <Fixtures context={context} />

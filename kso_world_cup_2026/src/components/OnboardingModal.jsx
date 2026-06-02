@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { JOIN_CONFLICT_MESSAGE, INVITE_NOT_FOUND_MESSAGE } from '../utils/league'
 
 export default function OnboardingModal({ user, inviteCode, onDone, onSkip }) {
   const [name, setName] = useState('')
@@ -26,7 +27,7 @@ export default function OnboardingModal({ user, inviteCode, onDone, onSkip }) {
         .single()
 
       if (groupError || !group) {
-        setError('Invite code not found. Double-check and try again.')
+        setError(INVITE_NOT_FOUND_MESSAGE)
         setLoading(false)
         return
       }
@@ -38,11 +39,7 @@ export default function OnboardingModal({ user, inviteCode, onDone, onSkip }) {
         .single()
 
       if (memberError) {
-        setError(
-          memberError.code === '23505'
-            ? 'You\'re already in this group, or that name is taken.'
-            : memberError.message
-        )
+        setError(memberError.code === '23505' ? JOIN_CONFLICT_MESSAGE : memberError.message)
         setLoading(false)
         return
       }

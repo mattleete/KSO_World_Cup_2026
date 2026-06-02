@@ -30,26 +30,33 @@ VITE_SUPABASE_ANON_KEY=...    # Supabase anon/public key
 ```
 src/
   components/
-    Nav.jsx           # sticky top nav — logo + 5 tabs + sign out
-    Landing.jsx       # countdown hero to June 11 2026
-    PlayerBoard.jsx   # leaderboard — player cards sorted by points
-    Fixtures.jsx      # match schedule + results from WC2026 API
-    Teams.jsx         # all 48 teams as tiles, sorted by FIFA rank
-    Rules.jsx         # static scoring rules page
-    Login.jsx         # magic link email login form
-    GroupFlow.jsx     # create group / join group / pick group flow
-    Draft.jsx         # live draft room — waiting room + draft board
-    Preferences.jsx   # drag-and-drop team preference ranking list
+    Nav.jsx             # sticky top nav — logo + 4 tabs (logged in) + ⚽ user menu; login CTA only when logged out
+    Landing.jsx         # countdown hero to June 11 2026
+    PicksAndPoints.jsx  # leaderboard — player cards sorted by points, expandable per-match detail
+    Fixtures.jsx        # match schedule + results from WC2026 API (card grid, AEST)
+    Rules.jsx           # static scoring rules page
+    Login.jsx           # magic link email login modal
+    OnboardingModal.jsx # first-login modal — set name + optionally join a league
+    AccountModals.jsx   # ModalShell + Edit name / Join league / Create league modals
+    MyLeaguesModal.jsx  # list leagues, switch active, copy code, transfer commissioner, manage members, leave/delete
+    GroupFlow.jsx       # Draft-tab create league / join league / pick league flow
+    Draft.jsx           # live draft room — waiting room + draft board + commissioner controls
+    Preferences.jsx     # drag-and-drop team preference ranking list
   data/
-    players.js        # 19 KSO players + placeholder drafted team IDs (legacy)
-    teams.js          # 48 WC2026 teams with tier, flag, FIFA rank, apiName
-    dummyResults.js   # test match results (not used in production)
+    teams.js            # 48 WC2026 teams with tier, flag, FIFA rank, apiName; TIER_CONFIG multipliers
+    teamGroups.js       # team name → World Cup group letter (A–L)
+    dummyFixtures.js    # dummy fixtures + a full 24-player completed draft for UI testing
+    dummyResults.js     # test match results (UI testing only)
+    players.js          # legacy hardcoded roster — no longer used for ownership
   utils/
-    api.js            # fetchFixtures() + fetchResults() — calls WC2026 API
-    scoring.js        # calcMatchPoints / calcTeamPoints / calcPlayerPoints
+    api.js              # fetchFixtures() + fetchResults() — calls WC2026 API, normalises team names
+    scoring.js          # calcMatchPoints / calcTeamPoints / calcPlayerPoints
+    league.js           # shared generateInviteCode + join/create error copy
   lib/
-    supabase.js       # Supabase client singleton
+    supabase.js         # Supabase client singleton
 ```
+
+Note: terminology is **"league"** in all user-facing copy (the DB tables are still named `groups`/`group_members`).
 
 ## Supabase database schema
 
@@ -115,19 +122,22 @@ Unique: `(group_member_id, team_id)`, `(group_member_id, rank)`
 - `commissioner_pick(p_draft_session_id, p_team_id)` — same but commissioner picks on behalf of current player
 - `undo_pick(p_draft_session_id)` — deletes last pick, rewinds pick number
 - `auto_draft(p_draft_session_id)` — picks current player's highest-ranked available team from their preferences (falls back to FIFA rank order)
+- `reset_draft(p_group_id)` — commissioner-only; deletes all picks/order/session for the league (back to waiting room)
+- `leave_league(p_group_id)` — leave a league you're in; blocked once a draft_session exists; commissioner must transfer/delete first
+- `remove_member(p_group_id, p_member_id)` — commissioner-only; remove a member before the draft starts
+- `delete_league(p_group_id)` — commissioner-only; deletes the league and all related rows (session, order, picks, preferences, members)
 
 ## Auth flow
-1. User clicks Draft tab → sees Login component
+1. User clicks the "Log in" CTA in the nav → Login modal
 2. Enters email → Supabase sends magic link via Resend SMTP
-3. Clicks link → redirected back to app, session established, navigates to Draft tab
-4. GroupFlow checks if user has group memberships:
-   - None → Create group or Join group (enter invite code)
-   - One → goes straight to draft room
-   - Multiple → shows group picker
-5. Sign out button in Nav clears session
+3. Clicks link → redirected back to app, session established, lands on the Picks & Points tab; first-time users (no display name) see the onboarding modal
+4. League context: auto-loads when the user is in exactly one league; the Draft tab's GroupFlow (or the ⚽ menu) handles create/join/pick when there are zero or multiple
+5. Sign out from the ⚽ user menu clears session
 
 ## Realtime subscriptions (in Draft.jsx)
-- `draft_session` UPDATE → updates current pick number and status live
+- `draft_session` INSERT (filtered by group_id, while in the waiting room) → non-commissioners drop into the board live when the draft starts
+- `draft_session` UPDATE → updates current pick number, status, and pick deadline live
+- `draft_session` DELETE → returns everyone to the waiting room when the commissioner resets
 - `draft_picks` INSERT → adds new pick to board live across all clients
 
 ## WC2026 API
@@ -153,13 +163,15 @@ Handled via `apiName` field in `teams.js` and `normalizeTeamName()` in `api.js`.
 Algeria (id: 47) and Curaçao (id: 48) appear in the API but are not drafted in any KSO group.
 
 ## Scoring rules
-- Win: 2 pts | Draw: 1 pt | Loss: 0 pts
+- Win: 3 pts | Draw: 1 pt | Loss: 0 pts
 - Bonus: +1 pt if winning margin ≥ 2 goals
-- Multiplier applied to (base + bonus):
-  - Top 16 teams (FIFA rank 1–16): ×1
-  - Mid 16 teams (FIFA rank 17–32): ×2
-  - Bottom 16 teams (FIFA rank 33–48): ×3
+- Multiplier applied to (base + bonus), by FIFA rank at draft time (4 tiers of 12):
+  - Top 12 (rank 1–12): ×1
+  - Upper 12 (rank 13–24): ×2
+  - Lower 12 (rank 25–36): ×3
+  - Bottom 12 (rank 37–48): ×4
 - Formula: `(base + bonus) × multiplier`
+- Source of truth: `src/data/teams.js` (`TIER_CONFIG`) + `src/utils/scoring.js`; player-facing copy on the Rules page (`src/components/Rules.jsx`)
 
 ## Design
 - Figma file: https://www.figma.com/design/4HwN8rLXnbfd9loCUf0php/KSO-world-cup-2026

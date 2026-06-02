@@ -1,18 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-
-function generateInviteCode() {
-  const words = ['WOLF', 'HAWK', 'BULL', 'BEAR', 'LION', 'GOAT', 'LYNX', 'PUMA', 'IBIS', 'KITE']
-  const word = words[Math.floor(Math.random() * words.length)]
-  const num = Math.floor(Math.random() * 90) + 10
-  return `${word}-${num}`
-}
+import { generateInviteCode, JOIN_CONFLICT_MESSAGE, INVITE_NOT_FOUND_MESSAGE } from '../utils/league'
 
 export function ModalShell({ onClose, children }) {
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key === 'Escape') onClose?.()
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <div
         className="bg-white rounded-2xl p-8 w-full max-w-md mx-4 relative"
@@ -100,7 +104,7 @@ export function JoinLeagueModal({ user, displayName, onDone, onClose }) {
       .single()
 
     if (groupError || !group) {
-      setError('Invite code not found. Double-check and try again.')
+      setError(INVITE_NOT_FOUND_MESSAGE)
       setLoading(false)
       return
     }
@@ -112,11 +116,7 @@ export function JoinLeagueModal({ user, displayName, onDone, onClose }) {
       .single()
 
     if (memberError) {
-      setError(
-        memberError.code === '23505'
-          ? 'That name is already taken in this league — try a different one.'
-          : memberError.message
-      )
+      setError(memberError.code === '23505' ? JOIN_CONFLICT_MESSAGE : memberError.message)
       setLoading(false)
       return
     }
