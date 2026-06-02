@@ -1,16 +1,26 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 const TABS = [
-  { id: 'picks',    label: 'KSO Picks & Points' },
-  { id: 'fixtures', label: 'Fixtures'            },
-  { id: 'teams',    label: 'Team Info'            },
-  { id: 'rules',    label: 'Rules'                },
-  { id: 'leagues',  label: 'Leagues'              },
-  { id: 'draft',    label: 'Draft'               },
+  { id: 'picks',    label: 'Picks & Points' },
+  { id: 'fixtures', label: 'Fixtures'        },
+  { id: 'draft',    label: 'Draft'           },
+  { id: 'rules',    label: 'Rules'           },
 ]
 
-export default function Nav({ activeTab, onTabChange, onLogoClick, session, onSignOut }) {
+export default function Nav({ activeTab, onTabChange, onLogoClick, session, displayName, onSignOut, onLoginClick, onEditName, onJoinLeague, onCreateLeague }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   function handleTabChange(id) {
     onTabChange(id)
@@ -21,6 +31,8 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, onSi
     onLogoClick()
     setMenuOpen(false)
   }
+
+  const loggedIn = !!session
 
   return (
     <>
@@ -33,30 +45,70 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, onSi
           KSO World Cup 2026
         </button>
 
-        {/* Desktop tab row */}
-        <div className="hidden sm:flex items-center gap-6 lg:gap-12">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] transition-opacity cursor-pointer bg-transparent border-none p-2 ${
-                activeTab === tab.id
-                  ? 'text-[#0a0a0a]'
-                  : 'text-[#0a0a0a]/40 hover:text-[#0a0a0a]/70'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-          {session && (
-            <button
-              onClick={onSignOut}
-              className="shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a]/70 transition-opacity cursor-pointer bg-transparent border-none p-2"
-            >
-              Sign out
-            </button>
-          )}
-        </div>
+        {/* Desktop — logged in */}
+        {loggedIn && (
+          <div className="hidden sm:flex items-center gap-6 lg:gap-10">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] transition-opacity cursor-pointer bg-transparent border-none p-2 ${
+                  activeTab === tab.id
+                    ? 'text-[#0a0a0a]'
+                    : 'text-[#0a0a0a]/40 hover:text-[#0a0a0a]/70'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+
+            {/* User pill */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(o => !o)}
+                className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/70 hover:text-[#0a0a0a] transition-opacity cursor-pointer bg-transparent border-none p-2"
+              >
+                <span>⚽</span>
+                <span>{displayName}</span>
+                <span className="text-[#0a0a0a]/30">▾</span>
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-[#e9e9e9] rounded-lg shadow-sm min-w-[160px] overflow-hidden">
+                  {[
+                    { label: 'Update name',    action: onEditName    },
+                    { label: 'Join a league',  action: onJoinLeague  },
+                    { label: 'Create a league',action: onCreateLeague},
+                  ].map(({ label, action }) => (
+                    <button
+                      key={label}
+                      onClick={() => { action(); setDropdownOpen(false) }}
+                      className="w-full text-left px-4 py-3 text-[13px] text-[#0a0a0a]/60 hover:text-[#0a0a0a] hover:bg-[#f7f7f7] cursor-pointer bg-transparent border-none transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <div className="border-t border-[#e9e9e9]" />
+                  <button
+                    onClick={() => { onSignOut(); setDropdownOpen(false) }}
+                    className="w-full text-left px-4 py-3 text-[13px] text-[#0a0a0a]/40 hover:text-[#0a0a0a] hover:bg-[#f7f7f7] cursor-pointer bg-transparent border-none transition-colors"
+                  >
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Desktop — logged out */}
+        {!loggedIn && session !== undefined && (
+          <button
+            onClick={onLoginClick}
+            className="hidden sm:block text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a] border border-[#0a0a0a]/20 rounded-lg px-4 py-2 cursor-pointer hover:border-[#0a0a0a]/60 bg-transparent transition-colors"
+          >
+            Log in →
+          </button>
+        )}
 
         {/* Mobile hamburger */}
         <button
@@ -83,23 +135,45 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, onSi
       {menuOpen && (
         <div className="sm:hidden fixed inset-0 top-16 z-40 bg-white overflow-y-auto">
           <div className="flex flex-col px-8">
-            {TABS.map(tab => (
+            {loggedIn ? (
+              <>
+                {TABS.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`text-left py-5 text-[32px] font-semibold leading-none tracking-[-0.02em] border-b border-[#e9e9e9] bg-transparent border-x-0 border-t-0 cursor-pointer ${
+                      activeTab === tab.id ? 'text-[#0a0a0a]' : 'text-[#0a0a0a]/30'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+                {[
+                  { label: 'Update name',     action: onEditName     },
+                  { label: 'Join a league',   action: onJoinLeague   },
+                  { label: 'Create a league', action: onCreateLeague },
+                ].map(({ label, action }) => (
+                  <button
+                    key={label}
+                    onClick={() => { action(); setMenuOpen(false) }}
+                    className="text-left py-4 text-[22px] font-semibold leading-none tracking-[-0.02em] border-b border-[#e9e9e9] bg-transparent border-x-0 border-t-0 cursor-pointer text-[#0a0a0a]/30 hover:text-[#0a0a0a]/60"
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => { onSignOut(); setMenuOpen(false) }}
+                  className="text-left py-5 text-[32px] font-semibold leading-none tracking-[-0.02em] text-[#0a0a0a]/30 bg-transparent border-none cursor-pointer mt-4"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
               <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`text-left py-5 text-[32px] font-semibold leading-none tracking-[-0.02em] border-b border-[#e9e9e9] bg-transparent border-x-0 border-t-0 cursor-pointer ${
-                  activeTab === tab.id ? 'text-[#0a0a0a]' : 'text-[#0a0a0a]/30'
-                }`}
+                onClick={() => { onLoginClick(); setMenuOpen(false) }}
+                className="text-left py-5 text-[32px] font-semibold leading-none tracking-[-0.02em] text-[#0a0a0a] bg-transparent border-none cursor-pointer"
               >
-                {tab.label}
-              </button>
-            ))}
-            {session && (
-              <button
-                onClick={() => { onSignOut(); setMenuOpen(false) }}
-                className="text-left py-5 text-[32px] font-semibold leading-none tracking-[-0.02em] text-[#0a0a0a]/30 bg-transparent border-none cursor-pointer mt-4"
-              >
-                Sign out
+                Log in →
               </button>
             )}
           </div>

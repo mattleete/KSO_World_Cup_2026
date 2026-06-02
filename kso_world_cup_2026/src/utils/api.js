@@ -61,6 +61,7 @@ export async function fetchFixtures() {
     stage:  formatStage(m.round, m.group_name),
     score1: m.home_score,
     score2: m.away_score,
+    status: m.status ?? null,
   }))
 
   normalised.sort((a, b) => new Date(a.date) - new Date(b.date))

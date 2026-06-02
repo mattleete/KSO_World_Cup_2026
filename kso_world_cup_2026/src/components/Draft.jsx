@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { TEAMS } from '../data/teams'
+import { TEAM_GROUPS } from '../data/teamGroups'
 import Preferences from './Preferences'
+import {
+  DUMMY_DRAFT_PLAYERS,
+  DUMMY_DRAFT_ORDER,
+  DUMMY_DRAFT_PICKS,
+  DUMMY_DRAFT_SESSION,
+} from '../data/dummyFixtures'
+
+const USE_DUMMY = true // set to false to use live Supabase data
 
 const MULTIPLIER_LABEL = { top: '×1', mid: '×2', bottom: '×3' }
 
@@ -127,11 +136,41 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
   )
 }
 
+// ── Team card (used in both pick slots and available panel) ──────────────────
+
+function TeamCard({ team, isClickable, onClick }) {
+  const group = TEAM_GROUPS[team.name]
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-[6px] bg-[#f0f0f0] p-2 flex flex-col gap-0.5 transition-all ${
+        isClickable
+          ? 'cursor-pointer hover:bg-[#e4e4e4] active:scale-[0.98]'
+          : ''
+      }`}
+    >
+      <span className="text-[22px] leading-none">{team.flag}</span>
+      <p className="text-[12px] font-semibold leading-tight truncate">{team.name}</p>
+      <p className="text-[10px] text-[#0a0a0a]/50">
+        {group ? `Group ${group}` : '—'}
+      </p>
+      <p className="text-[10px] text-[#0a0a0a]/40">
+        #{team.fifaRank} · {MULTIPLIER_LABEL[team.tier]}
+      </p>
+    </div>
+  )
+}
+
+function EmptySlot() {
+  return (
+    <div className="rounded-[6px] border-2 border-dashed border-[#0a0a0a]/10 min-h-[76px]" />
+  )
+}
+
 // ── Draft board ───────────────────────────────────────────────────────────────
 
 function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf, onAutoDraft }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
-  const pickedTeams = Object.fromEntries(picks.map(p => [p.team_id, p]))
 
   const currentOrderEntry = draftOrder[draftSession.current_pick_number - 1]
   const currentMember = currentOrderEntry ? memberMap[currentOrderEntry.group_member_id] : null
@@ -143,14 +182,35 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
   const countdown = formatCountdown(secondsLeft)
   const isUrgent = secondsLeft !== null && secondsLeft <= 15
 
-  const sortedTeams = [...TEAMS].sort((a, b) => a.fifaRank - b.fifaRank)
-  const recentPicks = [...picks].reverse().slice(0, 10)
+  // Build picks lookup: member id → [team, team]
+  const picksByMember = {}
+  picks.forEach(pick => {
+    if (!picksByMember[pick.group_member_id]) picksByMember[pick.group_member_id] = []
+    picksByMember[pick.group_member_id].push(pick)
+  })
+
+  // Members in round-1 pick order (first N entries of draftOrder)
+  const membersInOrder = draftOrder
+    .slice(0, members.length)
+    .map(entry => memberMap[entry.group_member_id])
+    .filter(Boolean)
+
+  // Available teams (not yet picked), sorted by FIFA rank
+  const pickedTeamIds = new Set(picks.map(p => p.team_id))
+  const availableTeams = [...TEAMS]
+    .sort((a, b) => a.fifaRank - b.fifaRank)
+    .filter(t => !pickedTeamIds.has(t.id))
+
+  const canPick = !isDone && !picking && !isPaused && (isMyTurn || pickingOnBehalf)
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex flex-col gap-3">
-        <h1 className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-[1.1] tracking-[-0.02em]">
+      <div className="flex flex-col gap-2">
+        <h1
+          className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
+          style={{ letterSpacing: '-2.88px' }}
+        >
           {isDone
             ? 'Draft complete'
             : isMyTurn
@@ -160,10 +220,7 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
         {!isDone && (
           <p className="text-[#0a0a0a]/50 text-[16px]">
             Pick {draftSession.current_pick_number} of {TEAMS.length}
-            {' · '}
-            {picks.length} teams drafted
-            {' · '}
-            {TEAMS.length - picks.length} remaining
+            {' · '}{TEAMS.length - picks.length} teams remaining
           </p>
         )}
         {!isDone && countdown && !isPaused && (
@@ -172,12 +229,11 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
           </p>
         )}
         {isPaused && <p className="text-[16px] text-[#0a0a0a]/50">Draft is paused.</p>}
-        {!isPaused && isMyTurn && !isDone && (
-          <p className="text-[16px] text-[#0a0a0a]">Click a team below to make your pick.</p>
-        )}
-        {!isPaused && pickingOnBehalf && !isDone && (
+        {canPick && (
           <p className="text-[16px] text-[#0a0a0a]">
-            Picking on behalf of <span className="font-semibold">{currentMember?.display_name}</span> — click a team.
+            {pickingOnBehalf
+              ? `Picking on behalf of ${currentMember?.display_name} — click a team on the right.`
+              : 'Click a team on the right to make your pick.'}
           </p>
         )}
         {pickError && <p className="text-red-500 text-[14px]">{pickError}</p>}
@@ -185,161 +241,133 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
 
       {/* Commissioner controls */}
       {isCommissioner && !isDone && (
-        <div className="flex flex-col gap-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
-            Commissioner
-          </p>
-          <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={isPaused ? onResume : onPause}
+            className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
+          >
+            {isPaused ? 'Resume' : 'Pause'}
+          </button>
+          <button
+            onClick={onUndo}
+            disabled={picks.length === 0}
+            className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors disabled:opacity-40"
+          >
+            Undo
+          </button>
+          {!isMyTurn && !isPaused && (
             <button
-              onClick={isPaused ? onResume : onPause}
+              onClick={onTogglePickOnBehalf}
+              className={`rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer transition-colors ${
+                pickingOnBehalf ? 'bg-[#0a0a0a] text-white' : 'bg-[#e9e9e9] hover:bg-[#d8d8d8]'
+              }`}
+            >
+              {pickingOnBehalf ? 'Cancel' : `Pick for ${currentMember?.display_name ?? '…'}`}
+            </button>
+          )}
+          {!isPaused && (
+            <button
+              onClick={onAutoDraft}
               className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
             >
-              {isPaused ? 'Resume draft' : 'Pause draft'}
+              Auto-draft
             </button>
-            <button
-              onClick={onUndo}
-              disabled={picks.length === 0}
-              className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors disabled:opacity-40"
-            >
-              Undo last pick
-            </button>
-            {!isMyTurn && !isPaused && (
-              <button
-                onClick={onTogglePickOnBehalf}
-                className={`rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer transition-colors ${
-                  pickingOnBehalf
-                    ? 'bg-[#0a0a0a] text-white'
-                    : 'bg-[#e9e9e9] hover:bg-[#d8d8d8]'
-                }`}
-              >
-                {pickingOnBehalf ? 'Cancel' : `Pick for ${currentMember?.display_name ?? '…'}`}
-              </button>
-            )}
-            {!isPaused && (
-              <button
-                onClick={onAutoDraft}
-                className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
-              >
-                Auto-draft {currentMember?.display_name ?? '…'}
-              </button>
-            )}
-          </div>
+          )}
         </div>
       )}
 
-      {/* Pick order — next 5 picks */}
-      {!isDone && (
-        <div className="flex flex-col gap-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
-            Up next
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            {draftOrder
-              .slice(draftSession.current_pick_number - 1, draftSession.current_pick_number + 4)
-              .map((entry, i) => {
-                const member = memberMap[entry.group_member_id]
-                return (
-                  <div
-                    key={entry.pick_number}
-                    className={`rounded-lg px-3 py-2 text-[13px] font-medium ${
-                      i === 0
-                        ? 'bg-[#0a0a0a] text-white'
-                        : 'bg-[#e9e9e9] text-[#0a0a0a]/60'
-                    }`}
-                  >
-                    {member?.display_name ?? '?'}
-                  </div>
-                )
-              })}
+      {/* Split panel */}
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-10">
+
+        {/* ── Left: player list ─────────────────────────────────────────── */}
+        <div className="lg:w-[55%] flex flex-col">
+          <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_1fr_1fr] gap-x-2 gap-y-1 items-center mb-2">
+            <span />
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">Player</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">Pick 1</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">Pick 2</p>
           </div>
-        </div>
-      )}
 
-      {/* Team grid */}
-      <div className="flex flex-col gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
-          Teams
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {sortedTeams.map(team => {
-            const pick = pickedTeams[team.id]
-            const picker = pick ? memberMap[pick.group_member_id] : null
-            const isPicked = !!pick
-            const isClickable = !isPicked && !isDone && !picking && !isPaused &&
-              (isMyTurn || pickingOnBehalf)
-            const handleClick = () => {
-              if (!isClickable) return
-              pickingOnBehalf ? onCommissionerPick(team.id) : onPick(team.id)
-            }
+          <div className="flex flex-col gap-1">
+            {membersInOrder.map((member, i) => {
+              const memberPicks = picksByMember[member.id] || []
+              const team1 = memberPicks[0] ? TEAMS.find(t => t.id === memberPicks[0].team_id) : null
+              const team2 = memberPicks[1] ? TEAMS.find(t => t.id === memberPicks[1].team_id) : null
+              const isCurrentPicker = member.id === currentMember?.id
+              const isMe = member.id === membership.id
 
-            return (
-              <div
-                key={team.id}
-                onClick={handleClick}
-                className={`rounded-[4px] p-2 flex items-center justify-between h-14 transition-all ${
-                  isPicked
-                    ? 'bg-[#e9e9e9] opacity-40'
-                    : isClickable
-                    ? 'bg-[#e9e9e9] cursor-pointer hover:bg-[#d8d8d8] active:scale-[0.98]'
-                    : 'bg-[#e9e9e9]'
-                }`}
-              >
-                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-                  <span className="text-[28px] sm:text-[36px] leading-none shrink-0">{team.flag}</span>
-                  <p className="text-[16px] sm:text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] truncate">
-                    {team.name}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
-                  {picker && (
-                    <p className="text-[12px] sm:text-[14px] text-[#0a0a0a]/70 font-medium truncate max-w-[60px] sm:max-w-none">
-                      {picker.display_name}
-                    </p>
-                  )}
-                  <p className="text-[12px] sm:text-[14px] text-[#0a0a0a]/40">
-                    {MULTIPLIER_LABEL[team.tier]}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Recent picks */}
-      {recentPicks.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
-            Recent picks
-          </p>
-          <div className="flex flex-col gap-1 max-w-sm">
-            {recentPicks.map(pick => {
-              const team = TEAMS.find(t => t.id === pick.team_id)
-              const picker = memberMap[pick.group_member_id]
               return (
-                <div key={pick.id} className="flex items-center justify-between py-2 border-b border-[#e9e9e9]">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[20px]">{team?.flag}</span>
-                    <p className="text-[15px] font-medium">{team?.name}</p>
+                <div
+                  key={member.id}
+                  className={`grid grid-cols-[1.5rem_minmax(0,1fr)_1fr_1fr] gap-x-2 items-start rounded-lg px-1 py-1 ${
+                    isCurrentPicker ? 'bg-[#f7f7f7]' : ''
+                  }`}
+                >
+                  {/* Pick number */}
+                  <p className="text-[11px] text-[#0a0a0a]/30 pt-1.5 text-right">{i + 1}</p>
+
+                  {/* Name */}
+                  <div className="pt-1.5 min-w-0">
+                    <p className={`text-[13px] font-semibold truncate ${isCurrentPicker ? '' : 'text-[#0a0a0a]'}`}>
+                      {member.display_name}
+                    </p>
+                    {isMe && (
+                      <p className="text-[10px] text-[#0a0a0a]/40">You</p>
+                    )}
+                    {isCurrentPicker && !isMe && (
+                      <p className="text-[10px] text-green-600">Picking…</p>
+                    )}
                   </div>
-                  <p className="text-[14px] text-[#0a0a0a]/50">{picker?.display_name}</p>
+
+                  {/* Pick slot 1 */}
+                  {team1 ? <TeamCard team={team1} /> : <EmptySlot />}
+
+                  {/* Pick slot 2 */}
+                  {team2 ? <TeamCard team={team2} /> : <EmptySlot />}
                 </div>
               )
             })}
           </div>
         </div>
-      )}
 
-      {/* My preferences */}
-      <Preferences membership={membership} pickedTeamIds={picks.map(p => p.team_id)} />
+        {/* ── Right: available teams ────────────────────────────────────── */}
+        <div className="lg:w-[45%] flex flex-col gap-3">
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
+            {availableTeams.length} teams available
+          </p>
+          {availableTeams.length === 0 ? (
+            <p className="text-[14px] text-[#0a0a0a]/40">All teams have been drafted.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {availableTeams.map(team => (
+                <TeamCard
+                  key={team.id}
+                  team={team}
+                  isClickable={canPick}
+                  onClick={() => {
+                    if (!canPick) return
+                    pickingOnBehalf ? onCommissionerPick(team.id) : onPick(team.id)
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   )
 }
 
 // ── Main Draft component ──────────────────────────────────────────────────────
 
+const DUMMY_CONTEXT = {
+  group: { id: 'dummy-group', name: 'KSO World Cup', invite_code: 'WOLF-42', commissioner_id: 'user-1' },
+  membership: { id: '1', user_id: 'user-1', display_name: 'Matt' },
+}
+
 export default function Draft({ context }) {
-  const { group, membership } = context
+  const { group, membership } = USE_DUMMY ? DUMMY_CONTEXT : context
   const isCommissioner = group.commissioner_id === membership.user_id
 
   const [draftSession, setDraftSession] = useState(null)
@@ -356,6 +384,15 @@ export default function Draft({ context }) {
 
   // Load initial data
   useEffect(() => {
+    if (USE_DUMMY) {
+      setMembers(DUMMY_DRAFT_PLAYERS)
+      setDraftSession(DUMMY_DRAFT_SESSION)
+      setDraftOrder(DUMMY_DRAFT_ORDER)
+      setPicks(DUMMY_DRAFT_PICKS)
+      setLoading(false)
+      return
+    }
+
     async function load() {
       const [sessionRes, membersRes] = await Promise.all([
         supabase.from('draft_session').select().eq('group_id', group.id).maybeSingle(),
@@ -381,7 +418,7 @@ export default function Draft({ context }) {
 
   // Real-time subscriptions
   useEffect(() => {
-    if (!draftSession) return
+    if (!draftSession || USE_DUMMY) return
 
     const channel = supabase
       .channel(`draft-${draftSession.id}`)
