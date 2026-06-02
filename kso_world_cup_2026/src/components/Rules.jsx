@@ -5,7 +5,7 @@ const RULES = [
   },
   {
     heading: 'Points per match',
-    body: 'Win: 2 pts\nDraw: 1 pt\nLoss: 0 pts\nBonus: +1 pt if your team wins by 2 or more goals',
+    body: 'Win: 3 pts\nDraw: 1 pt\nLoss: 0 pts\nBonus: +1 pt if your team wins by 2 or more goals',
   },
   {
     heading: 'Multipliers',
@@ -17,7 +17,7 @@ const RULES = [
   },
   {
     heading: 'Example',
-    body: 'Australia (rank 25, ×3) beats Brazil 2–0:\nBase 2 pts + bonus 1 pt = 3 × 3 = 9 pts\n\nArgentina (rank 1, ×1) beats Australia 2–0:\nBase 2 pts + bonus 1 pt = 3 × 1 = 3 pts',
+    body: 'Australia (rank 25, ×3) beats Brazil 2–0:\nBase 3 pts + bonus 1 pt = 4 × 3 = 12 pts\n\nArgentina (rank 1, ×1) beats Australia 2–0:\nBase 3 pts + bonus 1 pt = 4 × 1 = 4 pts',
   },
   {
     heading: 'Winner',

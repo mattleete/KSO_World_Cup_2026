@@ -23,8 +23,8 @@ export function calcMatchPoints(teamName, match) {
   const oppScore = isTeam1 ? match.score2 : match.score1
 
   let base = 0
-  if (myScore > oppScore)      base = 2  // win
-  else if (myScore === oppScore) base = 1 // draw
+  if (myScore > oppScore)       base = 3  // win
+  else if (myScore === oppScore) base = 1  // draw
   // loss = 0
 
   const bonus = (myScore - oppScore) >= 2 ? 1 : 0
