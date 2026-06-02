@@ -8,7 +8,7 @@ function generateInviteCode() {
   return `${word}-${num}`
 }
 
-function ModalShell({ onClose, children }) {
+export function ModalShell({ onClose, children }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"

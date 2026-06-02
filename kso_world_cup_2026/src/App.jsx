@@ -8,6 +8,7 @@ import Rules from './components/Rules'
 import LoginModal from './components/Login'
 import OnboardingModal from './components/OnboardingModal'
 import { EditNameModal, JoinLeagueModal, CreateLeagueModal } from './components/AccountModals'
+import MyLeaguesModal from './components/MyLeaguesModal'
 import GroupFlow from './components/GroupFlow'
 import Draft from './components/Draft'
 
@@ -21,7 +22,7 @@ const isAuthCallback =
 // Capture invite code before Supabase strips query params
 const initialInviteCode = params.get('invite')
 
-// modal state: null | 'login' | 'onboarding' | 'editName' | 'joinLeague' | 'createLeague'
+// modal state: null | 'login' | 'onboarding' | 'editName' | 'joinLeague' | 'createLeague' | 'myLeagues'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(null)
@@ -119,6 +120,7 @@ export default function App() {
         onEditName={() => setModal('editName')}
         onJoinLeague={() => setModal('joinLeague')}
         onCreateLeague={() => setModal('createLeague')}
+        onMyLeagues={() => setModal('myLeagues')}
       />
       <main className="px-8 lg:px-[68px] py-16 lg:py-[91px]">
         {renderTab()}
@@ -155,6 +157,14 @@ export default function App() {
           user={session.user}
           displayName={displayName}
           onDone={handleLeagueDone}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'myLeagues' && session && (
+        <MyLeaguesModal
+          user={session.user}
+          context={context}
+          onSwitch={(newContext) => { setContext(newContext); setModal(null) }}
           onClose={() => setModal(null)}
         />
       )}

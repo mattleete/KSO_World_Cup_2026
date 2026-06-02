@@ -7,7 +7,7 @@ const TABS = [
   { id: 'rules',    label: 'Rules'           },
 ]
 
-export default function Nav({ activeTab, onTabChange, onLogoClick, session, displayName, onSignOut, onLoginClick, onEditName, onJoinLeague, onCreateLeague }) {
+export default function Nav({ activeTab, onTabChange, onLogoClick, session, displayName, onSignOut, onLoginClick, onEditName, onJoinLeague, onCreateLeague, onMyLeagues }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -78,6 +78,7 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, disp
                     { label: 'Update name',    action: onEditName    },
                     { label: 'Join a league',  action: onJoinLeague  },
                     { label: 'Create a league',action: onCreateLeague},
+                    { label: 'My Leagues',     action: onMyLeagues   },
                   ].map(({ label, action }) => (
                     <button
                       key={label}
@@ -152,6 +153,7 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, disp
                   { label: 'Update name',     action: onEditName     },
                   { label: 'Join a league',   action: onJoinLeague   },
                   { label: 'Create a league', action: onCreateLeague },
+                  { label: 'My Leagues',      action: onMyLeagues    },
                 ].map(({ label, action }) => (
                   <button
                     key={label}
