@@ -101,35 +101,37 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, disp
           </div>
         )}
 
-        {/* Desktop — logged out */}
+        {/* Logged out → direct Log in button (mobile + desktop); no hamburger */}
         {!loggedIn && session !== undefined && (
           <button
             onClick={onLoginClick}
-            className="hidden sm:block text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a] border border-[#0a0a0a]/20 rounded-lg px-4 py-2 cursor-pointer hover:border-[#0a0a0a]/60 bg-transparent transition-colors"
+            className="block text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a] border border-[#0a0a0a]/20 rounded-lg px-4 py-2 cursor-pointer hover:border-[#0a0a0a]/60 bg-transparent transition-colors"
           >
             Log in →
           </button>
         )}
 
-        {/* Mobile hamburger */}
-        <button
-          onClick={() => setMenuOpen(o => !o)}
-          className="sm:hidden flex flex-col justify-center gap-[5px] w-8 h-8 bg-transparent border-none cursor-pointer p-0"
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-        >
-          {menuOpen ? (
-            <>
-              <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded rotate-45 translate-y-[3.5px]" />
-              <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded -rotate-45 -translate-y-[3.5px]" />
-            </>
-          ) : (
-            <>
-              <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded" />
-              <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded" />
-              <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded" />
-            </>
-          )}
-        </button>
+        {/* Mobile hamburger — only when logged in (there are tabs/account to show) */}
+        {loggedIn && (
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            className="sm:hidden flex flex-col justify-center gap-[5px] w-8 h-8 bg-transparent border-none cursor-pointer p-0"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {menuOpen ? (
+              <>
+                <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded rotate-45 translate-y-[3.5px]" />
+                <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded -rotate-45 -translate-y-[3.5px]" />
+              </>
+            ) : (
+              <>
+                <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded" />
+                <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded" />
+                <span className="block w-5 h-[2px] bg-[#0a0a0a] rounded" />
+              </>
+            )}
+          </button>
+        )}
       </nav>
 
       {/* Mobile menu overlay */}
