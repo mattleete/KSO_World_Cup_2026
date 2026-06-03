@@ -12,17 +12,18 @@ const MIN_STAGE_H   = 440   // floor for very short viewports
 const STAGE_MARGIN  = 96    // px reserved below the stage (main's bottom padding) to avoid scroll
 const OCCY_W        = 240   // rendered px width (w-[240px])
 const OCCY_HW       = 120   // OCCY_W / 2 — element centre = body centre (viewBox symmetric on x=100)
-const OCCY_HH       = 108   // (240 × 270/300) / 2 = 108 — element centre
+const OCCY_HH       = 119   // (240 × 298/300) / 2 ≈ 119 — element centre
 const SVG_SCALE     = 0.8   // 240 / 300
 const VIEWBOX_MIN_X = -50   // viewBox x origin
 const N_SPHERES     = 8
-const GRAB_RANGE    = 125   // px world-space — only a close flag triggers a reach
-const GRAB_MAX      = 0.6   // cap so a reaching tentacle still keeps its flowing hang
+const GRAB_RANGE    = 90    // px world-space — only a close flag triggers a reach
+const GRAB_MAX      = 0.32  // cap so a reaching tentacle still keeps its flowing hang
 
-// Tentacles are splines through TSEG+1 points down their length — more points
-// let the line itself undulate (wiggle) rather than make a single S-bend.
-const TSEG = 8
-const SUCKER_K = [2, 4, 6]   // which spline points carry suction cups
+// Tentacles are verlet chains of CHAIN_N points, rendered as a tapered outline.
+const CHAIN_N = 10
+const SUCKER_K = [2, 4, 6]   // which chain points carry suction cups
+const TENT_BASE_HW = 18      // tentacle half-width at the base (thick, connects to body)
+const TENT_TIP_HW = 5        // tentacle half-width at the tip
 
 function daysUntil(date) {
   return Math.ceil((date - new Date()) / (1000 * 60 * 60 * 24))
@@ -85,6 +86,103 @@ function catmullRomPath(pts) {
   return d
 }
 
+// Build a closed, smooth tapered outline around a centre-line (tentacle): offset
+// each node left/right by a half-width that tapers base→tip, then trace a loop
+// (left side down, across the tip, right side back up) smoothed as one spline.
+function taperedOutline(center, baseHW, tipHW) {
+  const n = center.length
+  if (n < 2) return ''
+  const left = [], right = []
+  for (let k = 0; k < n; k++) {
+    const prev = center[Math.max(0, k - 1)]
+    const next = center[Math.min(n - 1, k + 1)]
+    let dx = next.x - prev.x, dy = next.y - prev.y
+    const len = Math.hypot(dx, dy) || 1
+    dx /= len; dy /= len
+    const nx = -dy, ny = dx                 // perpendicular
+    const f = k / (n - 1)
+    const hw = baseHW + (tipHW - baseHW) * f
+    left.push({ x: center[k].x + nx * hw, y: center[k].y + ny * hw })
+    right.push({ x: center[k].x - nx * hw, y: center[k].y - ny * hw })
+  }
+  const loop = [...left, ...right.reverse()]
+  return catmullRomPath(loop) + ' Z'
+}
+
+// Sample a flag emoji's colours by rendering it to a canvas, then CLUSTER
+// similar shades together so a gradient (e.g. several blues) collapses to one
+// representative colour per real colour. Returns up to 5 [r,g,b], dominant
+// first. Cached per emoji.
+const _flagColorCache = {}
+const MAX_FLAG_COLORS = 5
+function flagColors(emoji) {
+  if (_flagColorCache[emoji]) return _flagColorCache[emoji]
+  let result = []
+  try {
+    const size = 40
+    const cv = document.createElement('canvas')
+    cv.width = size; cv.height = size
+    const ctx = cv.getContext('2d', { willReadFrequently: true })
+    ctx.clearRect(0, 0, size, size)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.font = '32px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'
+    ctx.fillText(emoji, size / 2, size / 2)
+    const data = ctx.getImageData(0, 0, size, size).data
+
+    // fine pixel buckets first
+    const raw = {}
+    for (let p = 0; p < data.length; p += 4) {
+      if (data[p + 3] < 200) continue
+      const qr = Math.round(data[p] / 16) * 16
+      const qg = Math.round(data[p + 1] / 16) * 16
+      const qb = Math.round(data[p + 2] / 16) * 16
+      const key = `${qr},${qg},${qb}`
+      raw[key] = (raw[key] || 0) + 1
+    }
+    const sorted = Object.entries(raw)
+      .map(([k, c]) => ({ col: k.split(',').map(Number), c }))
+      .sort((a, b) => b.c - a.c)
+
+    // greedily merge shades within DIST of an existing cluster → one per colour
+    // (threshold tuned so gradient/anti-alias blends collapse — e.g. Australia's
+    // navy + lighter-blue edges become a single blue — without merging red/white)
+    const DIST2 = 125 * 125
+    const clusters = []
+    for (const { col, c } of sorted) {
+      let merged = false
+      for (const cl of clusters) {
+        const dr = cl.col[0] - col[0], dg = cl.col[1] - col[1], db = cl.col[2] - col[2]
+        if (dr * dr + dg * dg + db * db < DIST2) { cl.count += c; merged = true; break }
+      }
+      if (!merged) clusters.push({ col, count: c })   // representative = most frequent shade
+    }
+    clusters.sort((a, b) => b.count - a.count)
+    const total = clusters.reduce((s, cl) => s + cl.count, 0) || 1
+    // drop minor clusters (stray outline / anti-alias blend pixels), keep top 5
+    result = clusters.filter(cl => cl.count > total * 0.06).slice(0, MAX_FLAG_COLORS).map(cl => cl.col)
+    if (!result.length && clusters.length) result = [clusters[0].col]
+  } catch { result = [] }
+  _flagColorCache[emoji] = result
+  return result
+}
+
+const clamp255 = (v) => Math.max(0, Math.min(255, v))
+const rgbStr = (c) => `rgb(${clamp255(c[0])},${clamp255(c[1])},${clamp255(c[2])})`
+
+// Recolour Occy from a flag's palette: dominant colour → head, the flag's other
+// colours (max 4) distributed across the tentacles — ≤5 distinct colours total.
+function applyFlagColors(root, emoji) {
+  if (!root) return
+  const cols = flagColors(emoji)
+  if (!cols.length) return
+  const head = cols[0]                                  // dominant → head
+  const arms = cols.length > 1 ? cols.slice(1) : [head] // other colours → tentacles
+  root.querySelector('[data-occy-body]')?.setAttribute('fill', rgbStr(head))
+  root.querySelectorAll('[data-tent]').forEach((el, idx) => {
+    el.setAttribute('fill', rgbStr(arms[idx % arms.length]))
+  })
+}
+
 export default function Landing() {
   const days = daysUntil(WC_START)
   const heroText = days > 1
@@ -128,11 +226,20 @@ export default function Landing() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       occyRef.current.style.transform =
         `translate(${w / 2 - OCCY_HW}px, ${h * 0.3 - OCCY_HH}px)`
-      // Draw straight tentacles for static view
+      // Static pose: tentacles hang straight, drawn as tapered outlines
+      const segLen = TENT_LEN / (CHAIN_N - 1)
       OCCY_LEGS.forEach(([cx, ttop], i) => {
-        const d = `M${cx} ${ttop} L${cx} ${ttop + TENT_LEN}`
-        occyRef.current.querySelector(`[data-tent-bg="${i}"]`)?.setAttribute('d', d)
-        occyRef.current.querySelector(`[data-tent-fg="${i}"]`)?.setAttribute('d', d)
+        const center = Array.from({ length: CHAIN_N }, (_, k) => {
+          const f = k / (CHAIN_N - 1)
+          const fan = ((cx - 100) / 60) * TENT_LEN * 0.25 * f
+          return { x: cx + fan, y: ttop + segLen * k }
+        })
+        occyRef.current.querySelector(`[data-tent="${i}"]`)
+          ?.setAttribute('d', taperedOutline(center, TENT_BASE_HW, TENT_TIP_HW))
+        SUCKER_K.forEach((k, j) => {
+          const el = occyRef.current.querySelector(`[data-sucker="${i * N_SUCKERS + j}"]`)
+          if (el && center[k]) { el.setAttribute('cx', center[k].x.toFixed(1)); el.setAttribute('cy', center[k].y.toFixed(1)) }
+        })
       })
       if (heroRef.current) heroRef.current.style.opacity = '1'
       return
@@ -146,6 +253,9 @@ export default function Landing() {
       timer: Math.random() * 4000,
       duration: 3000 + Math.random() * 5000,
     }))
+    // Which team each flag currently shows (mutated imperatively on collect, so
+    // we never re-render React / restart the sim). Used to avoid duplicates.
+    const liveTeams = orbs.map(o => o.team)
 
     // Uniform random target across the WHOLE stage, except the top-left
     // keep-out zone (re-roll if it lands there) — so flags never aim into the
@@ -181,6 +291,19 @@ export default function Landing() {
       driftF: 0.12 + Math.random() * 0.40,   // slower idle drift
       driftPh: Math.random() * Math.PI * 2,
     }))
+
+    // ── Verlet chains — one per tentacle, simulated in SVG-local space ───
+    // Point 0 is pinned at the attachment; the rest hang and flop. restLen keeps
+    // segments rigid-ish; gravity/idle/inertia/grab forces drive the motion.
+    const segLen = TENT_LEN / (CHAIN_N - 1)
+    const tentChains = OCCY_LEGS.map(([cx, ttop]) => {
+      const chain = []
+      for (let k = 0; k < CHAIN_N; k++) {
+        const x = cx, y = ttop + segLen * k   // start hanging straight down
+        chain.push({ x, y, px: x, py: y })
+      }
+      return chain
+    })
 
     // ── Occy physics ─────────────────────────────────────────────────────
     const oPos = { x: w / 2, y: h * 0.30 }
@@ -368,8 +491,7 @@ export default function Landing() {
         const root = occyRef.current
         if (root) {
           tentElsRef.current = {
-            bg: Array.from(root.querySelectorAll('[data-tent-bg]')),
-            fg: Array.from(root.querySelectorAll('[data-tent-fg]')),
+            tent: Array.from(root.querySelectorAll('[data-tent]')),
             sk: Array.from(root.querySelectorAll('[data-sucker]')),
           }
         }
@@ -381,26 +503,27 @@ export default function Landing() {
       OCCY_LEGS.forEach(([cx, ttop], i) => {
         const te = tentElsRef.current
         if (!te) return
-        const bgEl = te.bg[i], fgEl = te.fg[i]
-        if (!bgEl || !fgEl) return
+        const tentEl = te.tent[i]
+        if (!tentEl) return
 
-        const ax = cx, ay = ttop
         const p = tentParams[i]
-        const ts = tSec * p.spd   // per-tentacle clock — desyncs the whole motion
+        const ts = tSec * p.spd
+        const chain = tentChains[i]
+        const fanDir = (cx - 100) / 60
 
-        // Fan + curl shape the resting hang; idle drift sways the whole arm.
-        const fanDir      = (cx - 100) / 60
-        const idleDrift   = Math.sin(ts * p.driftF + p.driftPh) * TENT_LEN * 0.10
-        const restLateral = fanDir * TENT_LEN * 0.52 + idleDrift
-        const curlX       = p.curl * 16
+        // Local-space force directions (Occy's wrapper is rotated by `lean`)
+        const cosL = Math.cos(-leanRad), sinL = Math.sin(-leanRad)  // for grab transform
+        const gy = 0.20 * dtN                    // gentle droop on top of the rest pose
+        // Splayed rest direction: outer arms fan outward, centre points straight
+        // down — arms radiate from the mantle like an octopus.
+        const restAngle = fanDir * 0.70
+        const dirX = Math.sin(restAngle), dirY = Math.cos(restAngle)
+        const perpX = -dirY, perpY = dirX        // perpendicular = wave direction
+        // Travelling wave that flows evenly down the whole arm (desynced per arm)
+        const waveSpeed = 2.0, waveLen = 1.25, waveAmp = 11
+        const curlDir = Math.sign(p.curl) || 1
 
-        // Travelling-wave parameters — vary per tentacle so none move alike.
-        const waveAmp   = 13 * p.a2                // wiggle radius (wider)
-        const waveLen   = 0.85 + (p.a2 - 0.6) * 0.5 // fewer, broader bends → smoother curves
-        const waveSpeed = 2.4
-        const ampPulse  = 0.75 + 0.25 * Math.sin(ts * p.f1b + p.ph2)  // slow breathing of the wiggle
-
-        // ── Grab setup: find nearest flag, derive a reach direction in SVG space
+        // ── Grab: nearest flag → its position in Occy-local coords ──
         const awx = (oPos.x - OCCY_HW) + (cx - VIEWBOX_MIN_X) * SVG_SCALE
         const awy = (oPos.y - OCCY_HH) + ttop * SVG_SCALE
         let tNearD = Infinity, tNearPos = null
@@ -408,69 +531,125 @@ export default function Landing() {
           const d = Math.hypot(s.pos.x - awx, s.pos.y - awy)
           if (d < tNearD) { tNearD = d; tNearPos = s.pos }
         })
-        let grabInfl = 0, gnx = 0, gny = 1, glen = TENT_LEN
+        let grabInfl = 0, gtx = 0, gty = 0
         if (tNearPos && tNearD < GRAB_RANGE) {
-          const relX = tNearPos.x - oPos.x
-          const relY = tNearPos.y - oPos.y
-          const cos = Math.cos(-leanRad), sin = Math.sin(-leanRad)
-          const svgFx = (relX * cos - relY * sin + OCCY_HW) / SVG_SCALE + VIEWBOX_MIN_X
-          const svgFy = (relX * sin + relY * cos + OCCY_HH) / SVG_SCALE
-          const fdx = svgFx - ax, fdy = svgFy - ay
-          const fd  = Math.hypot(fdx, fdy)
-          if (fd > 0) {
-            grabInfl = Math.pow(Math.max(0, 1 - tNearD / GRAB_RANGE), 1.6) * GRAB_MAX
-            gnx = fdx / fd; gny = fdy / fd
-            glen = Math.min(TENT_LEN, fd)
+          const relX = tNearPos.x - oPos.x, relY = tNearPos.y - oPos.y
+          gtx = (relX * cosL - relY * sinL + OCCY_HW) / SVG_SCALE + VIEWBOX_MIN_X
+          gty = (relX * sinL + relY * cosL + OCCY_HH) / SVG_SCALE
+          grabInfl = Math.pow(Math.max(0, 1 - tNearD / GRAB_RANGE), 1.6) * GRAB_MAX
+        }
+
+        const MAX_MOVE = 7
+        const REST_K = 0.10   // how firmly the arm follows its (waving) rest pose
+
+        // ── Verlet integration of the free points ──
+        for (let k = 1; k < CHAIN_N; k++) {
+          const pt = chain[k]
+          const f = k / (CHAIN_N - 1)
+          // travelling wave offset perpendicular to the arm; even envelope ramps
+          // in near the base then stays full, so the whole arm undulates.
+          const env = Math.min(1, f / 0.18)
+          const wob = Math.sin(ts * waveSpeed + p.ph1 - f * Math.PI * 2 * waveLen) * waveAmp * env
+          const restX = cx + dirX * segLen * k + perpX * wob
+          const restY = ttop + dirY * segLen * k + perpY * wob
+          const vx = (pt.x - pt.px) * 0.85
+          const vy = (pt.y - pt.py) * 0.85
+          pt.px = pt.x; pt.py = pt.y
+          pt.x += vx + (restX - pt.x) * REST_K * dtN
+          pt.y += vy + (restY - pt.y) * REST_K * dtN + gy
+          if (k >= CHAIN_N - 3) pt.x += curlDir * Math.abs(p.curl) * 0.6 * dtN  // tip curl
+          // cap per-frame displacement for stability
+          const mvx = pt.x - pt.px, mvy = pt.y - pt.py
+          const mv = Math.hypot(mvx, mvy)
+          if (mv > MAX_MOVE) { pt.x = pt.px + mvx / mv * MAX_MOVE; pt.y = pt.py + mvy / mv * MAX_MOVE }
+        }
+
+        // ── Constraints: pin the base, keep segment lengths (relax) ──
+        for (let iter = 0; iter < 4; iter++) {
+          chain[0].x = cx; chain[0].y = ttop
+          for (let k = 0; k < CHAIN_N - 1; k++) {
+            const a = chain[k], b = chain[k + 1]
+            const dx = b.x - a.x, dy = b.y - a.y
+            const dist = Math.hypot(dx, dy) || 0.001
+            const diff = (dist - segLen) / dist
+            if (k === 0) { b.x -= dx * diff; b.y -= dy * diff }   // a is pinned
+            else {
+              const mx = dx * 0.5 * diff, my = dy * 0.5 * diff
+              a.x += mx; a.y += my; b.x -= mx; b.y -= my
+            }
           }
         }
 
-        // ── Build points down the tentacle, each riding the travelling wave ──
-        const pts = []
-        for (let k = 0; k <= TSEG; k++) {
-          const f = k / TSEG                       // 0 at base … 1 at tip
-          // natural hanging position (fan + curl grow toward the tip)
-          let x = ax + restLateral * f + curlX * f
-          let y = ay + TENT_LEN * f
-          // travelling wiggle: phase shifts along the length → bends that drift
-          // downward over time. Amplitude ramps up quickly just below the base
-          // (smoothstep) then stays full the rest of the way, so the WHOLE leg
-          // wiggles — not just the tip — while the base stays anchored.
-          const phase = ts * waveSpeed + p.ph1 - f * Math.PI * 2 * waveLen
-          const ramp  = Math.min(1, f / 0.18)
-          const env   = ramp * ramp * (3 - 2 * ramp)   // smoothstep
-          const amp   = waveAmp * env * ampPulse
-          x += Math.sin(phase) * amp + Math.sin(phase * 1.6 + p.ph3) * amp * 0.22
-          // grab: blend the lower portion toward the flag (more pull near the tip)
-          if (grabInfl > 0) {
-            const t = grabInfl * f
-            x = x * (1 - t) + (ax + gnx * glen * f) * t
-            y = y * (1 - t) + (ay + gny * glen * f) * t
-          }
-          pts.push({ x, y })
+        // ── Bending stiffness: nudge each point toward the straight
+        // continuation of the previous segment. Resists sharp folds (keeps a
+        // graceful curve) without making the tentacle rigid. Light factor. ──
+        for (let k = 2; k < CHAIN_N; k++) {
+          const a = chain[k - 2], bb = chain[k - 1], c = chain[k]
+          const tx = bb.x + (bb.x - a.x), ty = bb.y + (bb.y - a.y)
+          c.x += (tx - c.x) * 0.06
+          c.y += (ty - c.y) * 0.06
         }
 
-        const d = catmullRomPath(pts)
-        bgEl.setAttribute('d', d)
-        fgEl.setAttribute('d', d)
+        // ── Grab pull on the lower points (after constraints) ──
+        if (grabInfl > 0) {
+          for (let k = CHAIN_N - 4; k < CHAIN_N; k++) {
+            if (k < 1) continue
+            const f = k / (CHAIN_N - 1)
+            const t = grabInfl * f * 0.18
+            chain[k].x += (gtx - chain[k].x) * t
+            chain[k].y += (gty - chain[k].y) * t
+          }
+        }
 
-        // Suction cups sit on chosen spline points
+        tentEl.setAttribute('d', taperedOutline(chain, TENT_BASE_HW, TENT_TIP_HW))
+
         SUCKER_K.forEach((k, j) => {
           const el = te.sk[i * N_SUCKERS + j]
-          if (!el || !pts[k]) return
-          el.setAttribute('cx', pts[k].x.toFixed(1))
-          el.setAttribute('cy', pts[k].y.toFixed(1))
+          if (!el || !chain[k]) return
+          el.setAttribute('cx', chain[k].x.toFixed(1))
+          el.setAttribute('cy', chain[k].y.toFixed(1))
         })
       })
 
-      // Sphere squash on proximity
+      // Collect on contact: Occy touches a flag → it poofs away and a NEW
+      // random team (not already on screen) reappears at a fresh location.
       orbStates.forEach((state, i) => {
         const el = orbRefs.current[i]
-        if (!el) return
-        if (Math.hypot(state.pos.x - oPos.x, state.pos.y - oPos.y) < SPHERE_R + 60 && !el.dataset.sq) {
-          el.dataset.sq = '1'
-          el.classList.add('flag-sphere--squash')
-          setTimeout(() => { el.classList.remove('flag-sphere--squash'); delete el.dataset.sq }, 480)
-        }
+        if (!el || el.dataset.poofing === '1') return
+        const d = Math.hypot(state.pos.x - oPos.x, state.pos.y - oPos.y)
+        if (d >= SPHERE_R + 48) return
+
+        applyFlagColors(occyRef.current, liveTeams[i].flag)  // Occy adopts the collected flag's colours
+        el.dataset.poofing = '1'
+        el.style.opacity = '0'                       // vanish instantly
+        setTimeout(() => {
+          // pick a team not currently shown on any flag
+          const used = new Set(liveTeams.map(t => t.id))
+          const choices = TEAMS.filter(t => !used.has(t.id))
+          const next = choices.length ? choices[Math.floor(Math.random() * choices.length)] : liveTeams[i]
+          liveTeams[i] = next
+          const span = el.querySelector('span')
+          if (span) span.textContent = next.flag
+          el.title = next.name
+
+          // respawn at a fresh spot: in-bounds, out of the corner, away from Occy
+          const pad = SPHERE_R + 18
+          let nx, ny, tries = 0
+          do {
+            nx = pad + Math.random() * (w - pad * 2)
+            ny = pad + Math.random() * (h - pad * 2)
+          } while ((inCorner(nx, ny, w, h) || Math.hypot(nx - oPos.x, ny - oPos.y) < 240) && ++tries < 40)
+
+          state.pos.x = nx; state.pos.y = ny
+          state.vel.x = (Math.random() - 0.5) * 0.6
+          state.vel.y = (Math.random() - 0.5) * 0.6
+          state.target = { x: nx, y: ny }
+          state.timer = 0
+          el.style.transform = `translate(${nx - SPHERE_R}px, ${ny - SPHERE_R}px)`
+          el.style.opacity = '1'                      // reappear at the new spot
+          el.dataset.near = ''
+          delete el.dataset.poofing
+        }, 200)
       })
 
       // Everything is now positioned for this frame — reveal the stage once.
@@ -510,7 +689,7 @@ export default function Landing() {
       <h1
         ref={textRef}
         className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
-        style={{ position: 'absolute', bottom: 32, left: 0, letterSpacing: '-2.88px', zIndex: 2 }}
+        style={{ position: 'absolute', bottom: 32, left: 0, right: 0, textAlign: 'center', letterSpacing: '-2.88px', zIndex: 2 }}
       >
         {heroText}
       </h1>
