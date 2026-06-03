@@ -9,7 +9,6 @@ const WC_START = new Date('2026-06-11T00:00:00+10:00') // AEST
 // without being clipped; the body stays the same on-screen size as before.
 const SPHERE_R      = 36    // half of 72px flag div
 const MIN_STAGE_H   = 440   // floor for very short viewports
-const STAGE_MARGIN  = 96    // px reserved below the stage (main's bottom padding) to avoid scroll
 const OCCY_W        = 240   // rendered px width (w-[240px])
 const OCCY_HW       = 120   // OCCY_W / 2 — element centre = body centre (viewBox symmetric on x=100)
 const OCCY_HH       = 119   // (240 × 298/300) / 2 ≈ 119 — element centre
@@ -200,17 +199,36 @@ export default function Landing() {
   const [orbs, setOrbs] = useState([])
   const [stageH, setStageH] = useState(560)
 
-  // Measure the available height so the stage fills the viewport (flags roam
-  // the whole page), then scatter the orbs across that full area — once.
+  // Make the stage a full-bleed canvas: full viewport width, and from just
+  // below the nav down to the viewport bottom — by breaking out of <main>'s
+  // padding (read at runtime so it works at every breakpoint). Returns {w,h}.
+  function layoutStage() {
+    const el = heroRef.current
+    if (!el) return { w: window.innerWidth, h: MIN_STAGE_H }
+    const main = el.closest('main')
+    const cs = main ? getComputedStyle(main) : null
+    const padTop = cs ? parseFloat(cs.paddingTop) : 0
+    const padBottom = cs ? parseFloat(cs.paddingBottom) : 0
+    const padLeft = cs ? parseFloat(cs.paddingLeft) : 0
+    const navH = main ? main.offsetTop : 0          // nav sits above main, in flow
+    const h = Math.max(MIN_STAGE_H, Math.round(window.innerHeight - navH))
+    el.style.width = '100vw'
+    el.style.marginLeft = `-${padLeft}px`           // reach the left viewport edge
+    el.style.marginTop = `-${padTop}px`             // start at the nav's bottom
+    el.style.marginBottom = `-${padBottom}px`       // reach the viewport bottom (no scroll)
+    el.style.height = `${h}px`
+    return { w: el.offsetWidth, h }
+  }
+
+  // Lay out the full-bleed stage, then scatter the orbs across it — once.
   useEffect(() => {
     if (!heroRef.current) return
-    const top = heroRef.current.getBoundingClientRect().top
-    const h = Math.max(MIN_STAGE_H, Math.round(window.innerHeight - top - STAGE_MARGIN))
+    const { w, h } = layoutStage()
     setStageH(h)
-    const w = heroRef.current.offsetWidth
     const pts = scatterOrbs(w, h, N_SPHERES)
     const shuffled = [...TEAMS].sort(() => Math.random() - 0.5)
     setOrbs(pts.map((p, i) => ({ ...p, team: shuffled[i] })))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -350,12 +368,9 @@ export default function Landing() {
     // then pulls any out-of-bounds orb back in). Imperative (no React state) to
     // avoid a re-render that would re-hide the stage.
     function syncSize() {
-      if (!heroRef.current) return
-      const top = heroRef.current.getBoundingClientRect().top
-      const nh = Math.max(MIN_STAGE_H, Math.round(window.innerHeight - top - STAGE_MARGIN))
-      heroRef.current.style.height = nh + 'px'
-      w = heroRef.current.offsetWidth
-      h = nh
+      const dims = layoutStage()
+      w = dims.w
+      h = dims.h
     }
     window.addEventListener('resize', syncSize)
 
@@ -673,7 +688,7 @@ export default function Landing() {
   return (
     <div
       ref={heroRef}
-      className="occy-stage w-full"
+      className="occy-stage"
       // Hidden until the animation positions everything on its first frame, so
       // nothing is ever seen sitting at the stage's top-left default origin.
       style={{ height: stageH, opacity: 0, transition: 'opacity 0.35s ease' }}
