@@ -137,6 +137,7 @@ export default function App() {
         onLogoClick={() => setActiveTab(null)}
         session={session}
         displayName={displayName}
+        leagueName={context?.group?.name}
         onSignOut={() => supabase.auth.signOut()}
         onLoginClick={() => setModal('login')}
         onEditName={() => setModal('editName')}

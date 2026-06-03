@@ -9,13 +9,13 @@ const WC_START = new Date('2026-06-11T00:00:00+10:00') // AEST
 // without being clipped; the body stays the same on-screen size as before.
 const SPHERE_R      = 36    // half of 72px flag div
 const MIN_STAGE_H   = 440   // floor for very short viewports
-const OCCY_W        = 240   // rendered px width (w-[240px])
-const OCCY_HW       = 120   // OCCY_W / 2 — element centre = body centre (viewBox symmetric on x=100)
-const OCCY_HH       = 119   // (240 × 298/300) / 2 ≈ 119 — element centre
-const SVG_SCALE     = 0.8   // 240 / 300
+// Occy's on-screen size is responsive (smaller on mobile), so OCCY_HW / OCCY_HH
+// / SVG_SCALE are measured from the rendered <svg> at runtime (see measureOccy).
+const VIEWBOX_W     = 300   // Octopus viewBox width  (-50 … 250)
+const VIEWBOX_H     = 298   // Octopus viewBox height
 const VIEWBOX_MIN_X = -50   // viewBox x origin
-const N_SPHERES     = 8
-const GRAB_RANGE    = 90    // px world-space — only a close flag triggers a reach
+const N_SPHERES     = 2
+const GRAB_RANGE    = 90    // px world-space at full size — scaled by SVG_SCALE
 const GRAB_MAX      = 0.32  // cap so a reaching tentacle still keeps its flowing hang
 
 // Tentacles are verlet chains of CHAIN_N points, rendered as a tapered outline.
@@ -184,8 +184,9 @@ function applyFlagColors(root, emoji) {
 
 export default function Landing() {
   const days = daysUntil(WC_START)
-  const heroText = days > 1
-    ? `The world cup starts in ${days} days`
+  // On mobile the countdown form breaks after "in" so "X days" sits on its own line.
+  const heroContent = days > 1
+    ? <>The world cup starts in<br className="sm:hidden" /> {days} days</>
     : days === 1 ? 'The world cup starts tomorrow'
     : days === 0 ? 'The world cup starts today'
     : 'The world cup is underway'
@@ -240,6 +241,18 @@ export default function Landing() {
     // old region (looked like flags "stuck in a corner").
     let w = heroRef.current?.offsetWidth  ?? 800
     let h = heroRef.current?.offsetHeight ?? stageH
+
+    // Occy renders smaller on mobile, so derive its size constants from the
+    // actual rendered <svg> (keeps positioning + flag-grab maths correct).
+    let SVG_SCALE = 0.8, OCCY_HW = 120, OCCY_HH = 119
+    function measureOccy() {
+      const svg = occyRef.current?.querySelector('svg')
+      const rw = svg?.offsetWidth || 240
+      SVG_SCALE = rw / VIEWBOX_W
+      OCCY_HW = rw / 2
+      OCCY_HH = (rw * VIEWBOX_H / VIEWBOX_W) / 2
+    }
+    measureOccy()
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       occyRef.current.style.transform =
@@ -371,6 +384,7 @@ export default function Landing() {
       const dims = layoutStage()
       w = dims.w
       h = dims.h
+      measureOccy()           // Occy size may flip at the mobile breakpoint
     }
     window.addEventListener('resize', syncSize)
 
@@ -547,11 +561,12 @@ export default function Landing() {
           if (d < tNearD) { tNearD = d; tNearPos = s.pos }
         })
         let grabInfl = 0, gtx = 0, gty = 0
-        if (tNearPos && tNearD < GRAB_RANGE) {
+        const grabRange = GRAB_RANGE * (SVG_SCALE / 0.8)   // scale reach with Occy's size
+        if (tNearPos && tNearD < grabRange) {
           const relX = tNearPos.x - oPos.x, relY = tNearPos.y - oPos.y
           gtx = (relX * cosL - relY * sinL + OCCY_HW) / SVG_SCALE + VIEWBOX_MIN_X
           gty = (relX * sinL + relY * cosL + OCCY_HH) / SVG_SCALE
-          grabInfl = Math.pow(Math.max(0, 1 - tNearD / GRAB_RANGE), 1.6) * GRAB_MAX
+          grabInfl = Math.pow(Math.max(0, 1 - tNearD / grabRange), 1.6) * GRAB_MAX
         }
 
         const MAX_MOVE = 7
@@ -632,7 +647,7 @@ export default function Landing() {
         const el = orbRefs.current[i]
         if (!el || el.dataset.poofing === '1') return
         const d = Math.hypot(state.pos.x - oPos.x, state.pos.y - oPos.y)
-        if (d >= SPHERE_R + 48) return
+        if (d >= SPHERE_R + 60 * SVG_SCALE) return   // reach scales with Occy's size
 
         applyFlagColors(occyRef.current, liveTeams[i].flag)  // Occy adopts the collected flag's colours
         el.dataset.poofing = '1'
@@ -698,7 +713,7 @@ export default function Landing() {
       ))}
 
       <div ref={occyRef} style={{ position: 'absolute', top: 0, left: 0, zIndex: 3 }}>
-        <Octopus hideShadow className="w-[240px] h-auto" />
+        <Octopus hideShadow className="w-[120px] sm:w-[240px] h-auto" />
       </div>
 
       <h1
@@ -706,7 +721,7 @@ export default function Landing() {
         className="text-[40px] sm:text-[56px] lg:text-[72px] font-semibold leading-none"
         style={{ position: 'absolute', bottom: 32, left: 0, right: 0, textAlign: 'center', letterSpacing: '-2.88px', zIndex: 2 }}
       >
-        {heroText}
+        {heroContent}
       </h1>
     </div>
   )

@@ -7,7 +7,7 @@ const TABS = [
   { id: 'rules',    label: 'Rules'           },
 ]
 
-export default function Nav({ activeTab, onTabChange, onLogoClick, session, displayName, onSignOut, onLoginClick, onEditName, onJoinLeague, onCreateLeague, onMyLeagues }) {
+export default function Nav({ activeTab, onTabChange, onLogoClick, session, displayName, leagueName, onSignOut, onLoginClick, onEditName, onJoinLeague, onCreateLeague, onMyLeagues }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -37,13 +37,18 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, disp
   return (
     <>
       <nav className="sticky top-0 z-50 bg-[#f7f7f7] h-16 flex items-center justify-between px-8 lg:px-16">
-        {/* Logo */}
-        <button
-          onClick={handleLogoClick}
-          className="text-[16px] font-semibold tracking-[-0.01em] text-[#0a0a0a] shrink-0 bg-transparent border-none cursor-pointer p-0"
-        >
-          KSO World Cup 2026
-        </button>
+        {/* Left side — active league name when logged in; otherwise empty
+            (the spacer keeps the right-hand controls right-aligned) */}
+        {loggedIn && leagueName ? (
+          <button
+            onClick={handleLogoClick}
+            className="text-[16px] font-semibold tracking-[-0.01em] text-[#0a0a0a] shrink-0 bg-transparent border-none cursor-pointer p-0 truncate max-w-[60%]"
+          >
+            {leagueName}
+          </button>
+        ) : (
+          <span aria-hidden="true" />
+        )}
 
         {/* Desktop — logged in */}
         {loggedIn && (
