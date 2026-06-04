@@ -16,9 +16,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
-import { TEAMS } from '../data/teams'
-
-const MULTIPLIER_LABEL = { top: '×1', mid: '×2', bottom: '×3' }
+import { TEAMS, getMultiplier } from '../data/teams'
 
 // ── Sortable team row ─────────────────────────────────────────────────────────
 
@@ -64,7 +62,7 @@ function SortableTeamRow({ team, rank, isPicked }) {
           <span className="text-[28px] leading-none">{team.flag}</span>
           <p className="text-[18px] font-semibold leading-[1.1] tracking-[-0.02em]">{team.name}</p>
         </div>
-        <p className="text-[13px] text-[#0a0a0a]/40 shrink-0">{MULTIPLIER_LABEL[team.tier]}</p>
+        <p className="text-[13px] text-[#0a0a0a]/40 shrink-0">{getMultiplier(team.tier)}x</p>
       </div>
     </div>
   )
