@@ -17,6 +17,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { TEAMS, getMultiplier } from '../data/teams'
+import { TEAM_GROUPS } from '../data/teamGroups'
 
 // ── Sortable team row ─────────────────────────────────────────────────────────
 
@@ -57,12 +58,14 @@ function SortableTeamRow({ team, rank, isPicked }) {
       <p className="text-[13px] text-[#0a0a0a]/30 w-6 shrink-0 tabular-nums">{rank}</p>
 
       {/* Team info */}
-      <div className="bg-[#e9e9e9] rounded-[4px] px-3 flex items-center justify-between flex-1 h-full">
-        <div className="flex items-center gap-3">
-          <span className="text-[28px] leading-none">{team.flag}</span>
-          <p className="text-[18px] font-semibold leading-[1.1] tracking-[-0.02em]">{team.name}</p>
+      <div className="bg-[#e9e9e9] rounded-[4px] px-3 flex items-center gap-3 flex-1 h-full min-w-0">
+        <span className="text-[28px] leading-none shrink-0">{team.flag}</span>
+        <p className="text-[18px] font-semibold leading-[1.1] tracking-[-0.02em] truncate min-w-0 flex-1">{team.name}</p>
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-[13px] text-[#0a0a0a]/40">
+          <span>Group {TEAM_GROUPS[team.name] ?? '—'}</span>
+          <span className="tabular-nums">Rank: {team.fifaRank}</span>
+          <span className="text-[#0a0a0a]/60 font-medium">{getMultiplier(team.tier)}x points</span>
         </div>
-        <p className="text-[13px] text-[#0a0a0a]/40 shrink-0">{getMultiplier(team.tier)}x</p>
       </div>
     </div>
   )
