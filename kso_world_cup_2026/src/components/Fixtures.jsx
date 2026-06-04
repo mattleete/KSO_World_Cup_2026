@@ -1,11 +1,22 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchFixtures } from '../utils/api'
+import { fetchManualResults, resultKey } from '../utils/results'
 import { getTeamByName, getTeamById } from '../data/teams'
 import { calcMatchPoints } from '../utils/scoring'
 import { DUMMY_FIXTURES, DUMMY_OWNERS } from '../data/dummyFixtures'
 
 const USE_DUMMY = false // set to true to use dummy data for UI testing
+
+// Overlay manually-entered scores onto the API fixture list (manual wins).
+function applyManual(fixtures, manual) {
+  if (!manual?.length) return fixtures
+  const byKey = new Map(manual.map(m => [resultKey(m.team1, m.team2, m.stage), m]))
+  return fixtures.map(f => {
+    const m = byKey.get(resultKey(f.team1, f.team2, f.stage))
+    return m ? { ...f, score1: m.score1, score2: m.score2 } : f
+  })
+}
 
 function toAESTDateKey(dateStr) {
   if (!dateStr) return 'Date TBC'
@@ -135,7 +146,7 @@ export default function Fixtures({ context }) {
 
     async function load() {
       try {
-        const promises = [fetchFixtures()]
+        const promises = [fetchFixtures(), fetchManualResults().catch(() => [])]
 
         if (context) {
           promises.push(
@@ -144,8 +155,8 @@ export default function Fixtures({ context }) {
           )
         }
 
-        const [fixturesData, sessionRes, membersRes] = await Promise.all(promises)
-        setFixtures(fixturesData)
+        const [fixturesData, manual, sessionRes, membersRes] = await Promise.all(promises)
+        setFixtures(applyManual(fixturesData, manual))
 
         if (context && sessionRes?.data && membersRes?.data) {
           const picksRes = await supabase
@@ -176,6 +187,18 @@ export default function Fixtures({ context }) {
 
     load()
   }, [context])
+
+  // Light auto-refresh so manual/API score changes appear without a reload.
+  useEffect(() => {
+    if (USE_DUMMY) return
+    const id = setInterval(() => {
+      if (document.hidden) return
+      Promise.all([fetchFixtures(), fetchManualResults().catch(() => [])])
+        .then(([fx, manual]) => setFixtures(applyManual(fx, manual)))
+        .catch(() => {})
+    }, 60000)
+    return () => clearInterval(id)
+  }, [])
 
   const now = new Date()
   const nextMatch = fixtures.find(m => m.score1 == null && m.date && new Date(m.date) > now)

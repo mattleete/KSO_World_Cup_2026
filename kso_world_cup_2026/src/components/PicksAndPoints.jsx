@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { getTeamById, getTeamByName } from '../data/teams'
-import { fetchResults } from '../utils/api'
+import { loadAllResults } from '../utils/results'
 import { calcMatchPoints } from '../utils/scoring'
 import { DUMMY_RESULTS } from '../data/dummyResults'
 import { DUMMY_DRAFT_PLAYERS, DUMMY_ALL_PICKS } from '../data/dummyFixtures'
@@ -229,8 +229,8 @@ export default function PicksAndPoints({ context, onJoinLeague, onCreateLeague }
         const [sessionRes, membersRes, resultsData] = await Promise.all([
           supabase.from('draft_session').select().eq('group_id', context.group.id).maybeSingle(),
           supabase.from('group_members').select().eq('group_id', context.group.id),
-          // Don't let an API hiccup blank the whole leaderboard — fall back to no results.
-          fetchResults().catch(() => []),
+          // API feed + manual overrides; each fails soft so a hiccup can't blank the board.
+          loadAllResults(),
         ])
 
         let sessionPicks = []
@@ -254,6 +254,17 @@ export default function PicksAndPoints({ context, onJoinLeague, onCreateLeague }
     }
     load()
     return () => { cancelled = true }
+  }, [context])
+
+  // Light auto-refresh: re-pull results every ~60s so manual/API score changes
+  // show without a reload. Only the volatile `results` is refreshed.
+  useEffect(() => {
+    if (USE_DUMMY || !context) return
+    const id = setInterval(() => {
+      if (document.hidden) return
+      loadAllResults().then(setResults).catch(() => {})
+    }, 60000)
+    return () => clearInterval(id)
   }, [context])
 
   // No active league — prompt the user to join or create one.

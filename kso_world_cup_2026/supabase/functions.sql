@@ -338,3 +338,294 @@ begin
   delete from groups where id = p_group_id;
 end;
 $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  Admin page — commissioner draft management (post-draft)
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── Remove a member (post-draft) ───────────────────────────────────────────--
+-- Commissioner-only. Unlike remove_member (pre-draft only), this works at any
+-- time: it deletes the member's picks, order entries, and preferences first, so
+-- their drafted teams become available again, then removes the member.
+create or replace function admin_remove_member(p_group_id uuid, p_member_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_session_id uuid;
+begin
+  if not exists (
+    select 1 from groups
+    where id = p_group_id and commissioner_id = auth.uid()
+  ) then
+    raise exception 'Only the commissioner can remove members';
+  end if;
+
+  -- Confirm the member belongs to this league before touching anything.
+  if not exists (
+    select 1 from group_members where id = p_member_id and group_id = p_group_id
+  ) then
+    raise exception 'Member not found in this league';
+  end if;
+
+  select id into v_session_id from draft_session where group_id = p_group_id;
+  if v_session_id is not null then
+    delete from draft_picks
+    where draft_session_id = v_session_id and group_member_id = p_member_id;
+    delete from draft_order
+    where draft_session_id = v_session_id and group_member_id = p_member_id;
+  end if;
+
+  delete from draft_preferences where group_member_id = p_member_id;
+  delete from group_members where id = p_member_id and group_id = p_group_id;
+end;
+$$;
+
+-- ── Edit a member's display name ────────────────────────────────────────────--
+-- Commissioner-only. Lets the commissioner fix typos in any player's name,
+-- respecting the (group_id, display_name) unique constraint.
+create or replace function admin_set_member_name(p_group_id uuid, p_member_id uuid, p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := btrim(p_name);
+begin
+  if not exists (
+    select 1 from groups
+    where id = p_group_id and commissioner_id = auth.uid()
+  ) then
+    raise exception 'Only the commissioner can rename members';
+  end if;
+
+  if v_name = '' then
+    raise exception 'Name can''t be empty';
+  end if;
+
+  if exists (
+    select 1 from group_members
+    where group_id = p_group_id and display_name = v_name and id <> p_member_id
+  ) then
+    raise exception 'Another player in this league already uses that name';
+  end if;
+
+  update group_members
+  set display_name = v_name
+  where id = p_member_id and group_id = p_group_id;
+end;
+$$;
+
+-- ── Reassign a drafted team (swap-aware) ────────────────────────────────────--
+-- Commissioner-only. Changes the team on p_pick_id to p_team_id. If another
+-- pick in the same draft already holds p_team_id, the two picks SWAP teams in a
+-- single transaction. Implemented as delete-then-reinsert of the affected
+-- pick(s) so it never trips the (draft_session_id, team_id) unique constraint.
+create or replace function admin_set_pick_team(p_pick_id uuid, p_team_id integer)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_pick   draft_picks;   -- the pick being edited
+  v_other  draft_picks;   -- the pick currently holding p_team_id (if any)
+begin
+  if p_team_id < 1 or p_team_id > 48 then
+    raise exception 'Invalid team';
+  end if;
+
+  -- Load the target pick and verify the caller commissions its league.
+  select dp.* into v_pick
+  from draft_picks dp
+  join draft_session ds on ds.id = dp.draft_session_id
+  join groups g on g.id = ds.group_id
+  where dp.id = p_pick_id and g.commissioner_id = auth.uid();
+  if not found then raise exception 'Not authorized'; end if;
+
+  -- No-op if it already holds that team.
+  if v_pick.team_id = p_team_id then return; end if;
+
+  select * into v_other from draft_picks
+  where draft_session_id = v_pick.draft_session_id and team_id = p_team_id;
+
+  if found then
+    -- Swap: delete both, reinsert with teams exchanged (preserves pick slots).
+    delete from draft_picks where id in (v_pick.id, v_other.id);
+    insert into draft_picks (draft_session_id, pick_number, group_member_id, team_id, picked_at)
+    values
+      (v_pick.draft_session_id,  v_pick.pick_number,  v_pick.group_member_id,  p_team_id,      v_pick.picked_at),
+      (v_other.draft_session_id, v_other.pick_number, v_other.group_member_id, v_pick.team_id, v_other.picked_at);
+  else
+    -- Target team is unowned — straight reassignment.
+    update draft_picks set team_id = p_team_id where id = v_pick.id;
+  end if;
+end;
+$$;
+
+-- ── Scramble the draft order ────────────────────────────────────────────────--
+-- Commissioner-only. Re-rolls the snake draft order with a fresh random base
+-- sequence. Allowed only before any picks have been made (right after the draft
+-- starts) so it can't corrupt a draft in progress. Resets to pick #1.
+create or replace function scramble_draft_order(p_group_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_session_id uuid;
+  v_members uuid[];
+  v_n integer;
+  v_total integer;
+  v_round integer;
+  v_pos integer;
+  v_idx integer;
+  i integer;
+begin
+  if not exists (
+    select 1 from groups
+    where id = p_group_id and commissioner_id = auth.uid()
+  ) then
+    raise exception 'Only the commissioner can scramble the draft order';
+  end if;
+
+  select id into v_session_id from draft_session where group_id = p_group_id;
+  if v_session_id is null then
+    raise exception 'The draft hasn''t started yet';
+  end if;
+
+  if exists (select 1 from draft_picks where draft_session_id = v_session_id) then
+    raise exception 'Can''t scramble after picks have been made — reset the draft first';
+  end if;
+
+  -- Shuffled base order of this league's players.
+  select array_agg(id order by random()) into v_members
+  from group_members where group_id = p_group_id;
+  v_n := coalesce(array_length(v_members, 1), 0);
+  if v_n = 0 then raise exception 'No players to order'; end if;
+
+  -- Keep the same number of pick slots as the existing order.
+  select count(*) into v_total from draft_order where draft_session_id = v_session_id;
+  if v_total = 0 then raise exception 'No draft order to scramble'; end if;
+
+  delete from draft_order where draft_session_id = v_session_id;
+
+  -- Regenerate the snake: even rounds forward, odd rounds reversed.
+  for i in 0 .. v_total - 1 loop
+    v_round := i / v_n;
+    v_pos   := i % v_n;
+    if v_round % 2 = 0 then
+      v_idx := v_pos;
+    else
+      v_idx := v_n - 1 - v_pos;
+    end if;
+    insert into draft_order (draft_session_id, pick_number, group_member_id)
+    values (v_session_id, i + 1, v_members[v_idx + 1]);  -- arrays are 1-based
+  end loop;
+
+  update draft_session set current_pick_number = 1 where id = v_session_id;
+end;
+$$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  Match results — manual scores (superadmin only)
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- Global, canonical manual results. A row overrides the live WC2026 API feed for
+-- the same match everywhere points are computed (merged client-side by team pair
+-- + stage). Writes are locked to the superadmin email; everyone may read.
+
+create table if not exists match_results (
+  id          uuid primary key default gen_random_uuid(),
+  team1       text not null,
+  score1      integer not null,
+  team2       text not null,
+  score2      integer not null,
+  stage       text,
+  played_at   timestamptz,
+  updated_by  uuid,
+  updated_at  timestamptz not null default now()
+);
+
+alter table match_results enable row level security;
+
+-- Everyone (incl. anon) may read scores; writes go only through the SECURITY
+-- DEFINER functions below (no insert/update/delete policies = direct writes blocked).
+drop policy if exists "match_results readable by all" on match_results;
+create policy "match_results readable by all" on match_results for select using (true);
+
+-- ── Insert or update a manual result (superadmin) ──────────────────────────--
+-- p_id null → insert a new result; otherwise update that row. Returns the id.
+create or replace function upsert_match_result(
+  p_id uuid,
+  p_team1 text,
+  p_score1 integer,
+  p_team2 text,
+  p_score2 integer,
+  p_stage text,
+  p_played_at timestamptz
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+begin
+  if auth.email() <> 'matt.c.leete@gmail.com' then
+    raise exception 'Not authorized';
+  end if;
+
+  if p_id is null then
+    insert into match_results (team1, score1, team2, score2, stage, played_at, updated_by, updated_at)
+    values (p_team1, p_score1, p_team2, p_score2, p_stage, p_played_at, auth.uid(), now())
+    returning id into v_id;
+  else
+    update match_results
+    set team1 = p_team1, score1 = p_score1,
+        team2 = p_team2, score2 = p_score2,
+        stage = p_stage, played_at = p_played_at,
+        updated_by = auth.uid(), updated_at = now()
+    where id = p_id
+    returning id into v_id;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+-- ── Delete one manual result (superadmin) ──────────────────────────────────--
+create or replace function delete_match_result(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.email() <> 'matt.c.leete@gmail.com' then
+    raise exception 'Not authorized';
+  end if;
+  delete from match_results where id = p_id;
+end;
+$$;
+
+-- ── Reset all manual results (superadmin) ──────────────────────────────────--
+-- Wipes every manual score back to a fresh/unplayed baseline (for testing).
+create or replace function reset_all_match_results()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.email() <> 'matt.c.leete@gmail.com' then
+    raise exception 'Not authorized';
+  end if;
+  delete from match_results where id is not null;  -- WHERE satisfies sql_safe_updates
+end;
+$$;

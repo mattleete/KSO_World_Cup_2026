@@ -11,6 +11,8 @@ import { EditNameModal, JoinLeagueModal, CreateLeagueModal } from './components/
 import MyLeaguesModal from './components/MyLeaguesModal'
 import GroupFlow from './components/GroupFlow'
 import Draft from './components/Draft'
+import Admin from './components/Admin'
+import { SUPERADMIN_EMAIL } from './utils/results'
 
 // Capture auth callback params before Supabase cleans the URL.
 // PKCE flow uses ?code=, implicit flow uses #access_token=
@@ -127,7 +129,24 @@ export default function App() {
     }
 
     if (activeTab === 'rules') return <Rules />
+
+    if (activeTab === 'admin') {
+      if (session === undefined) return null
+      if (!session) return (
+        <p className="text-[16px] text-[#0a0a0a]/50">
+          <button onClick={() => setModal('login')} className="text-[#0a0a0a] underline bg-transparent border-none cursor-pointer">Log in</button>{' '}
+          to access admin.
+        </p>
+      )
+      if (!context) return <GroupFlow user={session.user} inviteCode={inviteCode} onReady={setContext} />
+      return <Admin context={context} session={session} />
+    }
   }
+
+  const showAdmin = !!session && (
+    context?.group?.commissioner_id === session.user.id ||
+    session.user.email === SUPERADMIN_EMAIL
+  )
 
   return (
     <div className="min-h-screen bg-white">
@@ -138,6 +157,7 @@ export default function App() {
         session={session}
         displayName={displayName}
         leagueName={context?.group?.name}
+        showAdmin={showAdmin}
         onSignOut={() => supabase.auth.signOut()}
         onLoginClick={() => setModal('login')}
         onEditName={() => setModal('editName')}

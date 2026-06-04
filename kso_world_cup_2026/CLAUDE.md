@@ -41,6 +41,8 @@ src/
     MyLeaguesModal.jsx  # list leagues, switch active, copy code, transfer commissioner, manage members, leave/delete
     GroupFlow.jsx       # Draft-tab create league / join league / pick league flow
     Draft.jsx           # live draft room — waiting room + draft board + commissioner controls
+    Admin.jsx           # commissioner admin tab — players/picks mgmt, games/scores, reset controls
+    AdminModals.jsx     # confirm / rename / edit-pick / score modals for the admin page
     Preferences.jsx     # drag-and-drop team preference ranking list
   data/
     teams.js            # 48 WC2026 teams with tier, flag, FIFA rank, apiName; TIER_CONFIG multipliers
@@ -50,6 +52,7 @@ src/
     players.js          # legacy hardcoded roster — no longer used for ownership
   utils/
     api.js              # fetchFixtures() + fetchResults() — calls WC2026 API, normalises team names
+    results.js          # loadAllResults() — merges API feed with manual match_results (manual wins); SUPERADMIN_EMAIL
     scoring.js          # calcMatchPoints / calcTeamPoints / calcPlayerPoints
     league.js           # shared generateInviteCode + join/create error copy
   lib/
@@ -117,6 +120,18 @@ Unique: `(draft_session_id, pick_number)`, `(draft_session_id, team_id)`
 | rank | integer | 1 = most preferred |
 Unique: `(group_member_id, team_id)`, `(group_member_id, rank)`
 
+### `match_results` (manual scores — global)
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | primary key |
+| team1 / team2 | text | canonical team names (must match `teams.js` `name`) |
+| score1 / score2 | integer | |
+| stage | text | e.g. "Group A", "Round of 16" |
+| played_at | timestamptz | |
+| updated_by | uuid | auth.users(id) of the editor |
+| updated_at | timestamptz | |
+Global, canonical manual results entered from the Admin page. A row **overrides** the live WC2026 API feed for the same match (matched client-side by unordered team pair + stage in `src/utils/results.js`) everywhere points are computed. RLS: everyone may SELECT; **writes only via the superadmin RPCs** below (no insert/update/delete policies). Editing is gated to `matt.c.leete@gmail.com` (the `SUPERADMIN_EMAIL` constant in `src/utils/results.js` and the same literal hardcoded in the SQL functions).
+
 ## Supabase Postgres functions (security definer)
 All functions are version-controlled in `supabase/functions.sql` (dependency-ordered) — paste the whole file into the Supabase SQL Editor to (re)install everything from scratch.
 - `make_pick(p_draft_session_id, p_team_id)` — validates turn, inserts pick, advances pick number
@@ -128,6 +143,13 @@ All functions are version-controlled in `supabase/functions.sql` (dependency-ord
 - `leave_league(p_group_id)` — leave a league you're in; blocked once a draft_session exists; commissioner must transfer/delete first
 - `remove_member(p_group_id, p_member_id)` — commissioner-only; remove a member before the draft starts
 - `delete_league(p_group_id)` — commissioner-only; deletes the league and all related rows (session, order, picks, preferences, members)
+- `admin_remove_member(p_group_id, p_member_id)` — commissioner-only; **post-draft** member removal (deletes their picks/order/preferences, frees their teams, then the member). Counterpart to the pre-draft-only `remove_member`
+- `admin_set_member_name(p_group_id, p_member_id, p_name)` — commissioner-only; rename any player (respects the `(group_id, display_name)` unique constraint)
+- `admin_set_pick_team(p_pick_id, p_team_id)` — commissioner-only; reassign a drafted team, **swap-aware** (if another pick holds the team, the two swap; implemented as delete-then-reinsert to avoid the `(draft_session_id, team_id)` unique-constraint hazard)
+- `scramble_draft_order(p_group_id)` — commissioner-only; re-rolls the snake order at random; **only before any picks exist** (right after the draft starts)
+- `upsert_match_result(p_id, p_team1, p_score1, p_team2, p_score2, p_stage, p_played_at)` — **superadmin-only** (`auth.email() = matt.c.leete@gmail.com`); insert (p_id null) or update a manual score
+- `delete_match_result(p_id)` — superadmin-only; drop one manual override
+- `reset_all_match_results()` — superadmin-only; wipe all manual scores back to fresh/unplayed (testing)
 
 ## Auth flow
 1. User clicks the "Log in" CTA in the nav → Login modal

@@ -7,10 +7,12 @@ const TABS = [
   { id: 'rules',    label: 'Rules'           },
 ]
 
-export default function Nav({ activeTab, onTabChange, onLogoClick, session, displayName, leagueName, onSignOut, onLoginClick, onEditName, onJoinLeague, onCreateLeague, onMyLeagues }) {
+export default function Nav({ activeTab, onTabChange, onLogoClick, session, displayName, leagueName, showAdmin, onSignOut, onLoginClick, onEditName, onJoinLeague, onCreateLeague, onMyLeagues }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
+
+  const tabs = showAdmin ? [...TABS, { id: 'admin', label: 'Admin' }] : TABS
 
   useEffect(() => {
     function handleClick(e) {
@@ -53,7 +55,7 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, disp
         {/* Desktop — logged in */}
         {loggedIn && (
           <div className="hidden sm:flex items-center gap-6 lg:gap-10">
-            {TABS.map(tab => (
+            {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
@@ -145,7 +147,7 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, disp
           <div className="flex flex-col px-8">
             {loggedIn ? (
               <>
-                {TABS.map(tab => (
+                {tabs.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
