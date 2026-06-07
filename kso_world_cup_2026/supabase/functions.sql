@@ -629,3 +629,40 @@ begin
   delete from match_results where id is not null;  -- WHERE satisfies sql_safe_updates
 end;
 $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  Draft preferences
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── Save a member's full draft preference order (atomic) ────────────────────--
+-- Replaces the member's entire preference list in one transaction.
+-- A plain upsert can't do this safely: draft_preferences has unique constraints
+-- on BOTH (group_member_id, team_id) and (group_member_id, rank). Rewriting the
+-- ranks in place collides on the rank index mid-statement (Postgres checks the
+-- non-deferred unique constraint row-by-row), so any reorder aborts and the
+-- whole save silently fails. Delete-then-insert inside a single function call
+-- avoids the collision and is atomic. The caller must own the membership.
+create or replace function save_draft_preferences(p_member_id uuid, p_team_ids integer[])
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+begin
+  select user_id into v_user_id from group_members where id = p_member_id;
+  if v_user_id is null then
+    raise exception 'Member not found';
+  end if;
+  if v_user_id <> auth.uid() then
+    raise exception 'Not authorized';
+  end if;
+
+  delete from draft_preferences where group_member_id = p_member_id;
+
+  insert into draft_preferences (group_member_id, team_id, rank)
+  select p_member_id, t.team_id, t.ord
+  from unnest(p_team_ids) with ordinality as t(team_id, ord);
+end;
+$$;

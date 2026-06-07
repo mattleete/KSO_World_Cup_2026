@@ -150,6 +150,7 @@ All functions are version-controlled in `supabase/functions.sql` (dependency-ord
 - `upsert_match_result(p_id, p_team1, p_score1, p_team2, p_score2, p_stage, p_played_at)` — **superadmin-only** (`auth.email() = matt.c.leete@gmail.com`); insert (p_id null) or update a manual score
 - `delete_match_result(p_id)` — superadmin-only; drop one manual override
 - `reset_all_match_results()` — superadmin-only; wipe all manual scores back to fresh/unplayed (testing)
+- `save_draft_preferences(p_member_id, p_team_ids)` — caller-owns-membership; **atomic** full-list replace (delete-then-insert) of a member's draft preference order. Required because `draft_preferences` is unique on **both** `(group_member_id, team_id)` and `(group_member_id, rank)`: a plain rank-rewriting upsert collides on the rank index mid-statement and silently aborts, so reorders fail to save
 
 ## Auth flow
 1. User clicks the "Log in" CTA in the nav → Login modal

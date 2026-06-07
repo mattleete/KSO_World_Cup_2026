@@ -80,6 +80,7 @@ export default function Preferences({ membership, pickedTeamIds = [] }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -112,24 +113,24 @@ export default function Preferences({ membership, pickedTeamIds = [] }) {
       return arrayMove(prev, oldIndex, newIndex)
     })
     setSaved(false)
+    setError(null)
   }
 
   async function handleSave() {
     setSaving(true)
     setSaved(false)
+    setError(null)
 
-    const rows = order.map((teamId, i) => ({
-      group_member_id: membership.id,
-      team_id: teamId,
-      rank: i + 1,
-    }))
+    // Atomic full-list replace via RPC. A plain upsert can't rewrite the ranks:
+    // draft_preferences is unique on both (member, team) and (member, rank), so
+    // reordering collides on the rank index mid-statement and the save aborts.
+    const { error } = await supabase.rpc('save_draft_preferences', {
+      p_member_id: membership.id,
+      p_team_ids: order,
+    })
 
-    // Upsert all preferences
-    const { error } = await supabase
-      .from('draft_preferences')
-      .upsert(rows, { onConflict: 'group_member_id,team_id' })
-
-    if (!error) setSaved(true)
+    if (error) setError(error.message)
+    else setSaved(true)
     setSaving(false)
   }
 
@@ -160,6 +161,10 @@ export default function Preferences({ membership, pickedTeamIds = [] }) {
           {saving ? 'Saving…' : saved ? 'Saved' : 'Save order'}
         </button>
       </div>
+
+      {error && (
+        <p className="text-[13px] text-red-600">Couldn't save your order — {error}. Please try again.</p>
+      )}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={order} strategy={verticalListSortingStrategy}>
