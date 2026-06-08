@@ -83,6 +83,23 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
     try { return localStorage.getItem(storageKey) || '' } catch { return '' }
   })
   const [confirming, setConfirming] = useState(false)
+  const [orderedMembers, setOrderedMembers] = useState(members)
+  const [confirmingScramble, setConfirmingScramble] = useState(false)
+
+  // Keep the local pick order in sync as players join or leave.
+  useEffect(() => { setOrderedMembers(members) }, [members])
+
+  function scrambleOrder() {
+    setOrderedMembers(prev => {
+      const arr = [...prev]
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[arr[i], arr[j]] = [arr[j], arr[i]]
+      }
+      return arr
+    })
+    setConfirmingScramble(false)
+  }
 
   function updateExpected(v) {
     setExpectedCount(v)
@@ -108,19 +125,30 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
         </p>
       </div>
 
-      {/* Member list */}
+      {/* Member list — shown in pick order */}
       <div className="flex flex-col gap-2 max-w-sm">
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
-          {members.length} {members.length === 1 ? 'player' : 'players'} joined
+          {members.length} {members.length === 1 ? 'player' : 'players'} joined · pick order
         </p>
-        {members.map(m => (
+        {orderedMembers.map((m, i) => (
           <div key={m.id} className="bg-[#e9e9e9] rounded-lg px-4 py-3 flex items-center justify-between">
-            <p className="text-[16px] font-medium">{m.display_name}</p>
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-[12px] text-[#0a0a0a]/30 tabular-nums w-5 shrink-0">{i + 1}</span>
+              <p className="text-[16px] font-medium truncate">{m.display_name}</p>
+            </div>
             {m.id === membership.id && (
-              <p className="text-[12px] text-[#0a0a0a]/40 uppercase tracking-[0.08em]">You</p>
+              <p className="text-[12px] text-[#0a0a0a]/40 uppercase tracking-[0.08em] shrink-0">You</p>
             )}
           </div>
         ))}
+        {isCommissioner && members.length > 1 && (
+          <button
+            onClick={() => setConfirmingScramble(true)}
+            className="self-start bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
+          >
+            Scramble draft order
+          </button>
+        )}
       </div>
 
       {isCommissioner ? (
@@ -192,7 +220,7 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={onStartDraft}
+                  onClick={() => onStartDraft(orderedMembers.map(m => m.id))}
                   disabled={starting}
                   className="bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer disabled:opacity-40"
                 >
@@ -216,6 +244,37 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
       )}
 
       <Preferences membership={membership} />
+
+      {/* Confirm scramble (pre-draft) */}
+      {confirmingScramble && (
+        <ModalShell onClose={() => setConfirmingScramble(false)}>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <p className="text-[26px] font-semibold leading-[1.1] tracking-[-0.02em]">
+                Scramble the draft order?
+              </p>
+              <p className="text-[#0a0a0a]/50 text-[15px]">
+                This randomly reshuffles the pick order. You can scramble as many
+                times as you like before starting the draft.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={scrambleOrder}
+                className="flex-1 bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer"
+              >
+                Scramble
+              </button>
+              <button
+                onClick={() => setConfirmingScramble(false)}
+                className="text-[14px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] bg-transparent border-none cursor-pointer px-4"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
     </div>
   )
 }
@@ -258,11 +317,13 @@ function EmptySlot() {
 
 // ── Draft board ───────────────────────────────────────────────────────────────
 
-function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf, onAutoDraft, onResetTimer, onResetDraft }) {
+function DraftBoard({ group, membership, members, draftSession, draftOrder, picks, onPick, picking, pickError, isCommissioner, onPause, onResume, onUndo, onCommissionerPick, pickingOnBehalf, onTogglePickOnBehalf, onAutoDraft, onResetTimer, onResetDraft, onScrambleOrder }) {
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
   const [pendingPick, setPendingPick] = useState(null) // { team, onBehalf }
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [confirmingScramble, setConfirmingScramble] = useState(false)
+  const [scrambling, setScrambling] = useState(false)
 
   const currentOrderEntry = draftOrder[draftSession.current_pick_number - 1]
   const currentMember = currentOrderEntry ? memberMap[currentOrderEntry.group_member_id] : null
@@ -384,6 +445,14 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
                   className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
                 >
                   Reset timer
+                </button>
+              )}
+              {picks.length === 0 && (
+                <button
+                  onClick={() => setConfirmingScramble(true)}
+                  className="bg-[#e9e9e9] rounded-lg px-3 py-2 text-[13px] font-medium cursor-pointer hover:bg-[#d8d8d8] transition-colors"
+                >
+                  Scramble order
                 </button>
               )}
             </>
@@ -521,6 +590,44 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
               <button
                 onClick={() => setPendingPick(null)}
                 disabled={picking}
+                className="text-[14px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] bg-transparent border-none cursor-pointer px-4"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
+
+      {/* Confirm scramble order modal */}
+      {confirmingScramble && (
+        <ModalShell onClose={() => !scrambling && setConfirmingScramble(false)}>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <p className="text-[26px] font-semibold leading-[1.1] tracking-[-0.02em]">
+                Scramble the draft order?
+              </p>
+              <p className="text-[#0a0a0a]/50 text-[15px]">
+                This randomly reshuffles the pick order for everyone. Only possible
+                before the first pick is made. This can’t be undone.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  setScrambling(true)
+                  await onScrambleOrder()
+                  setScrambling(false)
+                  setConfirmingScramble(false)
+                }}
+                disabled={scrambling}
+                className="flex-1 bg-[#0a0a0a] text-white rounded-lg px-4 py-3 text-[14px] font-medium uppercase tracking-[0.08em] cursor-pointer disabled:opacity-40"
+              >
+                {scrambling ? 'Scrambling…' : 'Scramble order'}
+              </button>
+              <button
+                onClick={() => setConfirmingScramble(false)}
+                disabled={scrambling}
                 className="text-[14px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 hover:text-[#0a0a0a] bg-transparent border-none cursor-pointer px-4"
               >
                 Cancel
@@ -771,6 +878,20 @@ export default function Draft({ context }) {
     if (error) setPickError(error.message)
   }
 
+  async function handleScrambleOrder() {
+    setPickError(null)
+    const { error } = await supabase.rpc('scramble_draft_order', { p_group_id: group.id })
+    if (error) { setPickError(error.message); return }
+    // Re-roll happened server-side; refetch the new order and reset to pick 1.
+    const { data } = await supabase
+      .from('draft_order')
+      .select()
+      .eq('draft_session_id', draftSession.id)
+      .order('pick_number')
+    if (data) setDraftOrder(data)
+    setDraftSession(prev => prev ? { ...prev, current_pick_number: 1 } : prev)
+  }
+
   async function handleResetDraft() {
     setPickError(null)
     const { error } = await supabase.rpc('reset_draft', { p_group_id: group.id })
@@ -786,11 +907,13 @@ export default function Draft({ context }) {
     setPicks([])
   }
 
-  async function handleStartDraft() {
+  async function handleStartDraft(orderedIds) {
     setStarting(true)
     setError(null)
 
-    const memberIds = members.map(m => m.id)
+    // Use the (possibly scrambled) order from the waiting room; fall back to
+    // join order if none was passed.
+    const memberIds = orderedIds?.length ? orderedIds : members.map(m => m.id)
 
     // Rounds = total teams ÷ players, rounded down. Each player drafts that many
     // teams; any teams that don't divide evenly are left undrafted/unused.
@@ -885,6 +1008,7 @@ export default function Draft({ context }) {
       onAutoDraft={handleAutoDraft}
       onResetTimer={handleResetTimer}
       onResetDraft={handleResetDraft}
+      onScrambleOrder={handleScrambleOrder}
     />
   )
 }
