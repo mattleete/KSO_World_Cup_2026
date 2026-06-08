@@ -707,6 +707,10 @@ export default function Draft({ context }) {
   const picksLenRef = useRef(0)
   useEffect(() => { picksLenRef.current = picks.length }, [picks.length])
 
+  // Handle to the live channel so non-realtime actions (e.g. scramble) can
+  // broadcast a refresh signal to the other participants.
+  const channelRef = useRef(null)
+
   // Load initial data
   useEffect(() => {
     if (USE_DUMMY) {
@@ -823,9 +827,25 @@ export default function Draft({ context }) {
         table: 'draft_picks',
         filter: `draft_session_id=eq.${draftSession.id}`,
       }, payload => setPicks(prev => [...prev, payload.new]))
+      // Explicit refresh signal. A scramble only rewrites draft_order (a table
+      // we don't subscribe to) and resets current_pick_number to a value that's
+      // often unchanged, so postgres_changes can't be relied on. The commissioner
+      // broadcasts this after scrambling; everyone refetches the new order.
+      .on('broadcast', { event: 'order-changed' }, async () => {
+        const { data } = await supabase
+          .from('draft_order')
+          .select()
+          .eq('draft_session_id', draftSession.id)
+          .order('pick_number')
+        if (data) setDraftOrder(data)
+      })
       .subscribe()
 
-    return () => supabase.removeChannel(channel)
+    channelRef.current = channel
+    return () => {
+      channelRef.current = null
+      supabase.removeChannel(channel)
+    }
   }, [draftSession?.id])
 
   async function handlePick(teamId) {
@@ -910,6 +930,9 @@ export default function Draft({ context }) {
       .order('pick_number')
     if (data) setDraftOrder(data)
     setDraftSession(prev => prev ? { ...prev, current_pick_number: 1 } : prev)
+    // Tell the other participants to refetch — the order change isn't carried by
+    // postgres_changes (see the broadcast listener above).
+    channelRef.current?.send({ type: 'broadcast', event: 'order-changed', payload: {} })
   }
 
   async function handleResetDraft() {
