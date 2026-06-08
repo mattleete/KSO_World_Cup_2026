@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { TEAMS } from '../data/teams'
 import { TEAM_GROUPS } from '../data/teamGroups'
@@ -702,6 +702,11 @@ export default function Draft({ context }) {
   const [timeoutSeconds, setTimeoutSeconds] = useState(90)
   const [error, setError] = useState(null)
 
+  // Track pick count for the realtime handlers (whose closures would otherwise
+  // see a stale `picks`). Used to detect a pre-pick scramble — see below.
+  const picksLenRef = useRef(0)
+  useEffect(() => { picksLenRef.current = picks.length }, [picks.length])
+
   // Load initial data
   useEffect(() => {
     if (USE_DUMMY) {
@@ -785,7 +790,22 @@ export default function Draft({ context }) {
         schema: 'public',
         table: 'draft_session',
         filter: `id=eq.${draftSession.id}`,
-      }, payload => setDraftSession(payload.new))
+      }, async payload => {
+        setDraftSession(payload.new)
+        // A scramble re-rolls draft_order but only touches that table, which we
+        // don't subscribe to; its only cross-client signal is the session
+        // UPDATE it also triggers (it resets current_pick_number). A scramble
+        // can only happen before any picks exist, so when we're still pre-pick,
+        // refetch the order here so other participants see the new sequence.
+        if (picksLenRef.current === 0) {
+          const { data } = await supabase
+            .from('draft_order')
+            .select()
+            .eq('draft_session_id', payload.new.id)
+            .order('pick_number')
+          if (data) setDraftOrder(data)
+        }
+      })
       .on('postgres_changes', {
         event: 'DELETE',
         schema: 'public',
