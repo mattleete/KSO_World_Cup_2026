@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
-  MouseSensor,
-  TouchSensor,
+  PointerSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -34,27 +33,31 @@ function SortableTeamRow({ team, rank, isPicked }) {
   }
 
   return (
-    // The whole tile is the drag target (not just the handle) so it's easy to
-    // grab on mobile. The TouchSensor's press-and-hold delay still lets the list
-    // scroll normally — a quick swipe scrolls, a held press starts a drag.
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...(isPicked ? {} : listeners)}
-      className={`rounded-[4px] flex items-center gap-3 h-14 transition-opacity select-none ${
-        isPicked
-          ? 'opacity-30 cursor-not-allowed'
-          : isDragging
-            ? 'opacity-80 shadow-lg cursor-grabbing'
-            : 'cursor-grab active:cursor-grabbing'
+      className={`rounded-[4px] flex items-center gap-2 h-14 transition-opacity ${
+        isPicked ? 'opacity-30' : isDragging ? 'opacity-80 shadow-lg' : ''
       }`}
     >
-      {/* Drag handle (visual affordance — the entire tile is draggable) */}
-      <div className="flex flex-col gap-[3px] px-2 py-4 shrink-0">
-        <span className="block w-4 h-[2px] bg-[#0a0a0a]/30 rounded" />
-        <span className="block w-4 h-[2px] bg-[#0a0a0a]/30 rounded" />
-        <span className="block w-4 h-[2px] bg-[#0a0a0a]/30 rounded" />
+      {/* Drag handle — large, full-height touch target. touch-action:none lets
+          dnd-kit receive the touch-move (the press isn't treated as a scroll);
+          because only the handle has this, the rest of the list still scrolls. */}
+      <div
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+        className={`flex flex-col items-center justify-center gap-[3px] self-stretch px-4 shrink-0 touch-none select-none rounded-l-[4px] ${
+          isPicked
+            ? 'cursor-not-allowed'
+            : isDragging
+              ? 'cursor-grabbing bg-[#0a0a0a]/5'
+              : 'cursor-grab active:cursor-grabbing hover:bg-[#0a0a0a]/5'
+        }`}
+      >
+        <span className="block w-5 h-[2px] bg-[#0a0a0a]/40 rounded" />
+        <span className="block w-5 h-[2px] bg-[#0a0a0a]/40 rounded" />
+        <span className="block w-5 h-[2px] bg-[#0a0a0a]/40 rounded" />
       </div>
 
       {/* Rank number */}
@@ -85,14 +88,13 @@ export default function Preferences({ membership, pickedTeamIds = [] }) {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
 
-  // Separate mouse + touch sensors (NOT PointerSensor): PointerSensor handles
-  // touch via unified pointer events with no hold delay, so on mobile it grabs
-  // the whole tile after a 5px move and fights the scroll gesture (the browser
-  // fires pointercancel and the drag never engages). MouseSensor for desktop,
-  // TouchSensor with a press-and-hold delay for mobile, keeps scroll + drag distinct.
+  // PointerSensor (mouse + touch) with a small movement threshold. Touch drag
+  // works because the drag handle sets touch-action:none (see SortableTeamRow),
+  // which is what lets the browser hand pointer-move events to dnd-kit instead
+  // of treating the press as a scroll. The rest of the tile keeps normal
+  // touch-action, so the list still scrolls — only the handle starts a drag.
   const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
 
   // Load saved preferences
