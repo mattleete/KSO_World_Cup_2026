@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -85,8 +85,13 @@ export default function Preferences({ membership, pickedTeamIds = [] }) {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
 
+  // Separate mouse + touch sensors (NOT PointerSensor): PointerSensor handles
+  // touch via unified pointer events with no hold delay, so on mobile it grabs
+  // the whole tile after a 5px move and fights the scroll gesture (the browser
+  // fires pointercancel and the drag never engages). MouseSensor for desktop,
+  // TouchSensor with a press-and-hold delay for mobile, keeps scroll + drag distinct.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
   )
 
