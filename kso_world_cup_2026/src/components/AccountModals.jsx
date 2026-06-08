@@ -44,15 +44,23 @@ export function EditNameModal({ currentName, onDone, onClose }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!name.trim()) return
+    const trimmed = name.trim()
+    if (!trimmed) return
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.updateUser({
-      data: { display_name: name.trim() },
+    // group_members.display_name is the source of truth shown on the
+    // leaderboard/draft/fixtures — update it across all the user's leagues first.
+    const { error: nameError } = await supabase.rpc('set_my_display_name', { p_name: trimmed })
+    if (nameError) { setError(nameError.message); setLoading(false); return }
+
+    // Keep auth metadata in sync (nav fallback + default name for new leagues).
+    const { error: authError } = await supabase.auth.updateUser({
+      data: { display_name: trimmed },
     })
-    if (error) { setError(error.message); setLoading(false); return }
-    onDone(name.trim())
+    if (authError) { setError(authError.message); setLoading(false); return }
+
+    onDone(trimmed)
   }
 
   return (

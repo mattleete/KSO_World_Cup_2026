@@ -151,6 +151,7 @@ All functions are version-controlled in `supabase/functions.sql` (dependency-ord
 - `delete_match_result(p_id)` — superadmin-only; drop one manual override
 - `reset_all_match_results()` — superadmin-only; wipe all manual scores back to fresh/unplayed (testing)
 - `save_draft_preferences(p_member_id, p_team_ids)` — caller-owns-membership; **atomic** full-list replace (delete-then-insert) of a member's draft preference order. Required because `draft_preferences` is unique on **both** `(group_member_id, team_id)` and `(group_member_id, rank)`: a plain rank-rewriting upsert collides on the rank index mid-statement and silently aborts, so reorders fail to save
+- `set_my_display_name(p_name)` — updates the caller's `group_members.display_name` across **all** their leagues. The per-league `display_name` is the source of truth shown on the leaderboard/draft/fixtures (auth `user_metadata` can't be read for other users); the account name-edit must sync it, not just the auth metadata. Respects `(group_id, display_name)` uniqueness with a friendly error
 
 ## Auth flow
 1. User clicks the "Log in" CTA in the nav → Login modal

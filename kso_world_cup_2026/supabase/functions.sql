@@ -666,3 +666,35 @@ begin
   from unnest(p_team_ids) with ordinality as t(team_id, ord);
 end;
 $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  Account
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── Rename yourself across all your leagues ─────────────────────────────────--
+-- The per-league group_members.display_name is the source of truth shown on the
+-- leaderboard / draft / fixtures (auth user_metadata can't be read for other
+-- users). The account "Update your name" edit only changed the auth metadata, so
+-- the visible name never updated. This syncs every membership the caller owns.
+-- Respects the (group_id, display_name) unique constraint with a friendly error.
+create or replace function set_my_display_name(p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := trim(p_name);
+begin
+  if v_name is null or v_name = '' then
+    raise exception 'Name cannot be empty';
+  end if;
+
+  update group_members
+  set display_name = v_name
+  where user_id = auth.uid();
+exception
+  when unique_violation then
+    raise exception 'That name is already taken in one of your leagues';
+end;
+$$;

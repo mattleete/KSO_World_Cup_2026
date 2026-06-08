@@ -183,7 +183,12 @@ export default function App() {
       {modal === 'editName' && session && (
         <EditNameModal
           currentName={displayName}
-          onDone={() => setModal(null)}
+          onDone={(newName) => {
+            setModal(null)
+            setContext(prev =>
+              prev ? { ...prev, membership: { ...prev.membership, display_name: newName } } : prev
+            )
+          }}
           onClose={() => setModal(null)}
         />
       )}
