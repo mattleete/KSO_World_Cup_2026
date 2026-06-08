@@ -34,21 +34,24 @@ function SortableTeamRow({ team, rank, isPicked }) {
   }
 
   return (
+    // The whole tile is the drag target (not just the handle) so it's easy to
+    // grab on mobile. The TouchSensor's press-and-hold delay still lets the list
+    // scroll normally — a quick swipe scrolls, a held press starts a drag.
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-[4px] flex items-center gap-3 h-14 transition-opacity ${
-        isPicked ? 'opacity-30' : isDragging ? 'opacity-80 shadow-lg' : ''
+      {...attributes}
+      {...(isPicked ? {} : listeners)}
+      className={`rounded-[4px] flex items-center gap-3 h-14 transition-opacity select-none ${
+        isPicked
+          ? 'opacity-30 cursor-not-allowed'
+          : isDragging
+            ? 'opacity-80 shadow-lg cursor-grabbing'
+            : 'cursor-grab active:cursor-grabbing'
       }`}
     >
-      {/* Drag handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className={`flex flex-col gap-[3px] px-2 py-4 shrink-0 ${
-          isPicked ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'
-        }`}
-      >
+      {/* Drag handle (visual affordance — the entire tile is draggable) */}
+      <div className="flex flex-col gap-[3px] px-2 py-4 shrink-0">
         <span className="block w-4 h-[2px] bg-[#0a0a0a]/30 rounded" />
         <span className="block w-4 h-[2px] bg-[#0a0a0a]/30 rounded" />
         <span className="block w-4 h-[2px] bg-[#0a0a0a]/30 rounded" />
@@ -84,7 +87,7 @@ export default function Preferences({ membership, pickedTeamIds = [] }) {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
   )
 
   // Load saved preferences
