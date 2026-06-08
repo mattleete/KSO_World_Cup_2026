@@ -128,6 +128,17 @@ function WaitingRoom({ group, membership, members, isCommissioner, onStartDraft,
           <p className="text-[14px] text-[#0a0a0a]/50">
             When everyone has joined, start the draft. Pick order is assigned as a snake draft. <span className="text-[#0a0a0a]/70">No one can join after the draft starts.</span>
           </p>
+          {members.length > 0 && (() => {
+            const perPlayer = Math.floor(TEAMS.length / members.length)
+            const unused = TEAMS.length - perPlayer * members.length
+            return (
+              <p className="text-[14px] text-[#0a0a0a]/50">
+                With <span className="text-[#0a0a0a]">{members.length}</span> {members.length === 1 ? 'player' : 'players'}, each drafts{' '}
+                <span className="text-[#0a0a0a]">{perPlayer}</span> {perPlayer === 1 ? 'team' : 'teams'}
+                {unused > 0 && <> · <span className="text-[#0a0a0a]">{unused}</span> {unused === 1 ? 'team' : 'teams'} will be unused</>}.
+              </p>
+            )
+          })()}
           <div className="flex flex-col gap-1">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
               Expected number of players
@@ -257,7 +268,11 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
   const currentMember = currentOrderEntry ? memberMap[currentOrderEntry.group_member_id] : null
   const isMyTurn = currentMember?.id === membership.id
   const isPaused = draftSession.status === 'paused'
-  const isDone = draftSession.status === 'complete' || draftSession.current_pick_number > TEAMS.length
+  // Total picks in this draft = draft_order length (rounds × players), which can
+  // be fewer than all 48 teams when players don't divide evenly. Unused teams
+  // simply stay in the available pool and are never drafted.
+  const totalPicks = draftOrder.length
+  const isDone = draftSession.status === 'complete' || (totalPicks > 0 && draftSession.current_pick_number > totalPicks)
 
   const secondsLeft = useCountdown(draftSession.pick_deadline)
   const countdown = formatCountdown(secondsLeft)
@@ -270,9 +285,8 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
     picksByMember[pick.group_member_id].push(pick)
   })
 
-  // How many picks each player gets, derived from the snake order. With 48
-  // teams and N players this is usually 48/N, but when N doesn't divide 48
-  // some players get one extra — draft_order is the source of truth.
+  // How many picks each player gets, derived from the snake order. Every player
+  // gets exactly floor(48 / players) picks; draft_order is the source of truth.
   const slotsByMember = {}
   draftOrder.forEach(entry => {
     slotsByMember[entry.group_member_id] = (slotsByMember[entry.group_member_id] || 0) + 1
@@ -308,8 +322,8 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
         </h1>
         {!isDone && (
           <p className="text-[#0a0a0a]/50 text-[16px]">
-            Pick {draftSession.current_pick_number} of {TEAMS.length}
-            {' · '}{TEAMS.length - picks.length} teams remaining
+            Pick {draftSession.current_pick_number} of {totalPicks}
+            {' · '}{totalPicks - picks.length} picks remaining
           </p>
         )}
         {!isDone && countdown && !isPaused && (
@@ -777,9 +791,20 @@ export default function Draft({ context }) {
     setError(null)
 
     const memberIds = members.map(m => m.id)
+
+    // Rounds = total teams ÷ players, rounded down. Each player drafts that many
+    // teams; any teams that don't divide evenly are left undrafted/unused.
+    const rounds = Math.floor(TEAMS.length / memberIds.length)
+    if (rounds < 1) {
+      setError(`Too many players (${memberIds.length}) for ${TEAMS.length} teams — each player needs at least one pick.`)
+      setStarting(false)
+      return
+    }
+    const totalPicks = rounds * memberIds.length
+
     let snakeOrder
     try {
-      snakeOrder = generateSnakeOrder(memberIds, TEAMS.length)
+      snakeOrder = generateSnakeOrder(memberIds, totalPicks)
     } catch (e) {
       setError(e.message)
       setStarting(false)
