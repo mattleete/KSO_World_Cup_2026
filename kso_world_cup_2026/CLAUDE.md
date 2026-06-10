@@ -147,6 +147,7 @@ All functions are version-controlled in `supabase/functions.sql` (dependency-ord
 - `admin_set_member_name(p_group_id, p_member_id, p_name)` — commissioner-only; rename any player (respects the `(group_id, display_name)` unique constraint)
 - `admin_set_pick_team(p_pick_id, p_team_id)` — commissioner-only; reassign a drafted team, **swap-aware** (if another pick holds the team, the two swap; implemented as delete-then-reinsert to avoid the `(draft_session_id, team_id)` unique-constraint hazard)
 - `scramble_draft_order(p_group_id)` — commissioner-only; re-rolls the snake order at random; **only before any picks exist** (right after the draft starts)
+- `admin_add_pick(p_group_id, p_member_id, p_team_id)` — commissioner-only; **post-draft** manual pick. Appends a `draft_picks` row (next `pick_number`) assigning a still-undrafted team to a member — for a player who joined after the draft. Rejects already-drafted teams; never alters other picks. The new member self-joins via the invite code first, then the commissioner assigns their teams from the Admin page (undrafted pool only)
 - `upsert_match_result(p_id, p_team1, p_score1, p_team2, p_score2, p_stage, p_played_at)` — **superadmin-only** (`auth.email() = matt.c.leete@gmail.com`); insert (p_id null) or update a manual score
 - `delete_match_result(p_id)` — superadmin-only; drop one manual override
 - `reset_all_match_results()` — superadmin-only; wipe all manual scores back to fresh/unplayed (testing)

@@ -531,6 +531,52 @@ begin
 end;
 $$;
 
+-- ── Add a pick for a member (post-draft, undrafted teams only) ──────────────--
+-- Commissioner-only. Manually assigns a still-undrafted team to a member — for
+-- someone who joined after the draft and needs teams. Appends a draft_picks row
+-- with the next pick_number and never touches anyone else's picks. The team must
+-- not already be drafted in this session.
+create or replace function admin_add_pick(p_group_id uuid, p_member_id uuid, p_team_id integer)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_session_id uuid;
+  v_next_pick integer;
+begin
+  if not exists (
+    select 1 from groups where id = p_group_id and commissioner_id = auth.uid()
+  ) then
+    raise exception 'Only the commissioner can add picks';
+  end if;
+
+  if not exists (
+    select 1 from group_members where id = p_member_id and group_id = p_group_id
+  ) then
+    raise exception 'Member not found in this league';
+  end if;
+
+  select id into v_session_id from draft_session where group_id = p_group_id;
+  if v_session_id is null then
+    raise exception 'The draft hasn''t started yet';
+  end if;
+
+  if exists (
+    select 1 from draft_picks where draft_session_id = v_session_id and team_id = p_team_id
+  ) then
+    raise exception 'That team has already been drafted';
+  end if;
+
+  select coalesce(max(pick_number), 0) + 1 into v_next_pick
+  from draft_picks where draft_session_id = v_session_id;
+
+  insert into draft_picks (draft_session_id, pick_number, group_member_id, team_id, picked_at)
+  values (v_session_id, v_next_pick, p_member_id, p_team_id, now());
+end;
+$$;
+
 -- ════════════════════════════════════════════════════════════════════════════
 --  Match results — manual scores (superadmin only)
 -- ════════════════════════════════════════════════════════════════════════════

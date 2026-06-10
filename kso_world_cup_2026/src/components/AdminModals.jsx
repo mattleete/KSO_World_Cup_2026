@@ -136,6 +136,51 @@ export function EditPickModal({ pick, ownerByTeamId, onSaved, onClose }) {
   )
 }
 
+// ── Add a pick for a member (undrafted teams only) ──────────────────────────────
+// For a player who joined after the draft. availableTeams: undrafted TEAMS only.
+export function AddPickModal({ member, groupId, availableTeams, onAdded, onClose }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  // Stays open after each add (parent refreshes availableTeams) so a whole
+  // roster can be assigned in one go; commissioner closes when done.
+  async function choose(teamId) {
+    setBusy(true)
+    setError(null)
+    const { error } = await supabase.rpc('admin_add_pick', {
+      p_group_id: groupId, p_member_id: member.id, p_team_id: teamId,
+    })
+    if (error) { setError(error.message); setBusy(false); return }
+    await onAdded()
+    setBusy(false)
+  }
+
+  return (
+    <ModalShell onClose={onClose}>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <p className={titleCls}>Add teams for {member.display_name}</p>
+          <p className={subCls}>Only undrafted teams are shown. Add as many as you like, then close.</p>
+        </div>
+        {error && <p className="text-red-500 text-[14px]">{error}</p>}
+        {availableTeams.length === 0 ? (
+          <p className="text-[14px] text-[#0a0a0a]/50">No undrafted teams are left to assign.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-1.5 max-h-[50vh] overflow-y-auto pr-1">
+            {availableTeams.map(t => (
+              <button key={t.id} onClick={() => choose(t.id)} disabled={busy}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-left cursor-pointer disabled:opacity-50 transition-colors bg-[#f0f0f0] hover:bg-[#e6e6e6]">
+                <span className="text-[18px] leading-none">{t.flag}</span>
+                <span className="text-[12px] font-semibold truncate">{t.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </ModalShell>
+  )
+}
+
 // ── Enter / override a match score (superadmin) ─────────────────────────────────
 // prefill: { id, team1, team2, stage, score1, score2 } (id null = new result).
 // manual: current manual results array, used for the duplicate guard.

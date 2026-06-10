@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { getTeamById } from '../data/teams'
+import { getTeamById, TEAMS } from '../data/teams'
 import { fetchFixtures } from '../utils/api'
 import { fetchManualResults, resultKey, SUPERADMIN_EMAIL } from '../utils/results'
-import { ConfirmModal, EditMemberNameModal, EditPickModal, ScoreModal } from './AdminModals'
+import { ConfirmModal, EditMemberNameModal, EditPickModal, AddPickModal, ScoreModal } from './AdminModals'
 
 const STATUS_LABEL = {
   waiting:  'Waiting room',
@@ -107,6 +107,8 @@ export default function Admin({ context, session }) {
     ;(picksByMember[p.group_member_id] ||= []).push(p)
   })
   const hasPicks = picks.length > 0
+  // Undrafted teams — the pool a late-joining player can be assigned from.
+  const availableTeams = TEAMS.filter(t => !ownerByTeamId.has(t.id))
 
   // Games table — fixtures with manual overlays + any manual-only rows.
   const manualByKey = new Map(manual.map(m => [resultKey(m.team1, m.team2, m.stage), m]))
@@ -270,6 +272,12 @@ export default function Admin({ context, session }) {
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <span className="text-[16px] font-semibold">{member.display_name}</span>
                     <div className="flex items-center gap-2 shrink-0">
+                      {draftSession && (
+                        <button onClick={() => setModal({ kind: 'addPick', member })}
+                          className="text-[11px] uppercase tracking-[0.08em] text-[#0a0a0a]/50 hover:text-[#0a0a0a] bg-transparent border-none cursor-pointer p-1">
+                          + Team
+                        </button>
+                      )}
                       <button onClick={() => setModal({ kind: 'rename', member })}
                         className="text-[11px] uppercase tracking-[0.08em] text-[#0a0a0a]/50 hover:text-[#0a0a0a] bg-transparent border-none cursor-pointer p-1">
                         Rename
@@ -400,6 +408,13 @@ export default function Admin({ context, session }) {
         <EditPickModal
           pick={modal.pick} ownerByTeamId={ownerByTeamId}
           onSaved={async () => { await loadDraft(); setModal(null); flash('Pick updated.') }}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === 'addPick' && (
+        <AddPickModal
+          member={modal.member} groupId={groupId} availableTeams={availableTeams}
+          onAdded={async () => { await loadDraft(); flash('Team added.') }}
           onClose={() => setModal(null)}
         />
       )}
