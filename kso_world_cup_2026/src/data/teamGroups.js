@@ -1,27 +1,28 @@
 // World Cup 2026 group assignments — team name → group letter
+// Generated from the live WC2026 feed (api.wc2026api.com) — the actual draw.
 export const TEAM_GROUPS = {
   // Group A
-  'Argentina': 'A', 'Mexico': 'A', 'Ghana': 'A', 'Egypt': 'A',
+  'Mexico': 'A', 'South Korea': 'A', 'Czech Republic': 'A', 'South Africa': 'A',
   // Group B
-  'France': 'B', 'Senegal': 'B', 'Panama': 'B', 'South Africa': 'B',
+  'Switzerland': 'B', 'Canada': 'B', 'Qatar': 'B', 'Bosnia & Herzegovina': 'B',
   // Group C
-  'Spain': 'C', 'Iran': 'C', 'Iraq': 'C', 'Cape Verde': 'C',
+  'Brazil': 'C', 'Morocco': 'C', 'Scotland': 'C', 'Haiti': 'C',
   // Group D
-  'England': 'D', 'South Korea': 'D', 'Qatar': 'D', 'DR Congo': 'D',
+  'USA': 'D', 'Turkey': 'D', 'Australia': 'D', 'Paraguay': 'D',
   // Group E
-  'Brazil': 'E', 'Ecuador': 'E', 'Uzbekistan': 'E', 'Haiti': 'E',
+  'Germany': 'E', 'Ecuador': 'E', 'Ivory Coast': 'E', 'Curaçao': 'E',
   // Group F
-  'Belgium': 'F', 'Canada': 'F', 'Saudi Arabia': 'F', 'New Zealand': 'F',
+  'Netherlands': 'F', 'Japan': 'F', 'Sweden': 'F', 'Tunisia': 'F',
   // Group G
-  'Portugal': 'G', 'Austria': 'G', 'Tunisia': 'G', 'Bosnia & Herzegovina': 'G',
+  'Belgium': 'G', 'Iran': 'G', 'Egypt': 'G', 'New Zealand': 'G',
   // Group H
-  'Netherlands': 'H', 'Turkey': 'H', 'Ivory Coast': 'H', 'Jordan': 'H',
+  'Spain': 'H', 'Uruguay': 'H', 'Saudi Arabia': 'H', 'Cape Verde': 'H',
   // Group I
-  'Germany': 'I', 'Czech Republic': 'I', 'Paraguay': 'I', 'Scotland': 'I',
+  'France': 'I', 'Senegal': 'I', 'Norway': 'I', 'Iraq': 'I',
   // Group J
-  'Colombia': 'J', 'Norway': 'J', 'Croatia': 'J', 'Algeria': 'J',
+  'Argentina': 'J', 'Austria': 'J', 'Jordan': 'J', 'Algeria': 'J',
   // Group K
-  'Morocco': 'K', 'Japan': 'K', 'Sweden': 'K', 'Curaçao': 'K',
+  'Portugal': 'K', 'Colombia': 'K', 'Uzbekistan': 'K', 'DR Congo': 'K',
   // Group L
-  'USA': 'L', 'Uruguay': 'L', 'Switzerland': 'L', 'Australia': 'L',
+  'England': 'L', 'Croatia': 'L', 'Panama': 'L', 'Ghana': 'L',
 }
