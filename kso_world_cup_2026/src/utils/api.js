@@ -1,10 +1,19 @@
 import { TEAMS } from '../data/teams'
+import { supabase } from '../lib/supabase'
 
-const API_BASE = 'https://api.wc2026api.com'
-const API_KEY  = import.meta.env.VITE_WORLDCUP_API_KEY
-
-function apiHeaders() {
-  return { Authorization: `Bearer ${API_KEY}` }
+// Clients no longer call the WC2026 API directly — its key has a tiny daily
+// request budget shared by every viewer. A scheduled GitHub Action fetches the
+// feed and caches it in the `match_feed` table (one row, id='wc2026'); we read
+// that here. Supabase reads aren't rate-limited, so usage no longer scales with
+// the number of viewers. See .github/workflows/refresh-fixtures.yml.
+async function fetchRawMatches() {
+  const { data, error } = await supabase
+    .from('match_feed')
+    .select('matches')
+    .eq('id', 'wc2026')
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return Array.isArray(data?.matches) ? data.matches : []
 }
 
 /**
@@ -50,9 +59,7 @@ export function toAEST(dateStr) {
  * Returns an array of normalised match objects.
  */
 export async function fetchFixtures() {
-  const res = await fetch(`${API_BASE}/matches`, { headers: apiHeaders() })
-  if (!res.ok) throw new Error(`Failed to fetch fixtures (${res.status})`)
-  const matches = await res.json()
+  const matches = await fetchRawMatches()
 
   const normalised = matches.map(m => ({
     team1:  normalizeTeamName(m.home_team),
@@ -73,9 +80,7 @@ export async function fetchFixtures() {
  * Returns only matches that have scores (i.e. have been played).
  */
 export async function fetchResults() {
-  const res = await fetch(`${API_BASE}/matches`, { headers: apiHeaders() })
-  if (!res.ok) throw new Error(`Failed to fetch results (${res.status})`)
-  const matches = await res.json()
+  const matches = await fetchRawMatches()
 
   return matches
     .filter(m => m.home_score !== null && m.away_score !== null)

@@ -167,13 +167,14 @@ All functions are version-controlled in `supabase/functions.sql` (dependency-ord
 - `draft_session` DELETE → returns everyone to the waiting room when the commissioner resets
 - `draft_picks` INSERT → adds new pick to board live across all clients
 
-## WC2026 API
-- Base URL: `https://api.wc2026api.com`
-- Auth header: `Authorization: Bearer <VITE_WORLDCUP_API_KEY>`
-- Main endpoint: `GET /matches`
+## WC2026 API (cached — clients never call it directly)
+- Base URL: `https://api.wc2026api.com`; auth `Authorization: Bearer <key>`; endpoint `GET /matches`
 - Match shape: `{ home_team, away_team, kickoff_utc, home_score, away_score, round, group_name, status }`
-- `fetchResults()` filters for completed matches (both scores non-null)
-- `fetchFixtures()` returns all matches sorted by `kickoff_utc`
+- **The API key has a ~100 requests/day limit shared across all clients.** A per-client fetch (especially the 60s polls in Fixtures/PicksAndPoints) blows it instantly with multiple viewers. So clients **do not** hit the API.
+- Instead, a scheduled GitHub Action (`.github/workflows/refresh-fixtures.yml`, repo root, runs on the **`main`** default branch) fetches `/matches` every 20 min (72/day, under the cap) and upserts the raw array into the `match_feed` Supabase table (one row, `id='wc2026'`) using the **service_role** key.
+- `fetchRawMatches()` in `api.js` reads `match_feed`; `fetchFixtures()` / `fetchResults()` normalise that cached array exactly as before. Supabase reads aren't rate-limited, so API usage no longer scales with viewers or polling.
+- The Action needs three repo **Actions secrets**: `WC2026_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. `VITE_WORLDCUP_API_KEY` is **no longer used by the frontend** (the key now lives only in the Action secret).
+- For live/urgent scores, the superadmin can still enter results manually in Admin (`match_results`), which override the cached feed everywhere.
 
 ## Team name mismatches (API → canonical)
 Handled via `apiName` field in `teams.js` and `normalizeTeamName()` in `api.js`.

@@ -744,3 +744,24 @@ exception
     raise exception 'That name is already taken in one of your leagues';
 end;
 $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  Match feed cache (decouples the WC2026 API from client/headcount)
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- The WC2026 API key has a tiny daily request budget and is shared by every
+-- client, so clients must NOT call it directly. Instead a scheduled GitHub
+-- Action fetches /matches a fixed number of times per day and upserts the raw
+-- response here; all clients read this table (no per-client API limit). The
+-- Action writes via the service_role key (bypasses RLS); everyone may read.
+
+create table if not exists match_feed (
+  id         text primary key,          -- singleton key, always 'wc2026'
+  matches    jsonb not null default '[]'::jsonb,  -- raw /matches response
+  fetched_at timestamptz not null default now()
+);
+
+alter table match_feed enable row level security;
+
+drop policy if exists "match_feed read" on match_feed;
+create policy "match_feed read" on match_feed for select using (true);
