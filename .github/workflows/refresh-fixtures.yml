@@ -3,12 +3,13 @@ name: Refresh WC2026 fixtures
 # Fetches the WC2026 /matches feed on a schedule and caches it in Supabase
 # (table: match_feed, single row id='wc2026'). All clients read that table
 # instead of calling the API directly, so API usage no longer scales with the
-# number of viewers. Every 20 minutes = 72 calls/day, under the 100/day cap
-# (leaves headroom for the occasional manual run below).
+# number of viewers. Every 5 minutes = 288 calls/day, under the 500/day plan
+# (leaves ~212/day headroom for manual runs). 5 min is GitHub's minimum cron
+# interval. Public repo, so Actions minutes are unlimited.
 
 on:
   schedule:
-    - cron: '*/20 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch: {}   # allows a manual "Run workflow" from the Actions tab
 
 # Never let two refreshes run at once.
