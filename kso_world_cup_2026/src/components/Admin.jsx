@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { getTeamById, TEAMS } from '../data/teams'
+import { getTeamById, TEAMS, getDisplayName } from '../data/teams'
 import { fetchFixtures } from '../utils/api'
 import { fetchManualResults, resultKey, SUPERADMIN_EMAIL } from '../utils/results'
 import { ConfirmModal, EditMemberNameModal, EditPickModal, AddPickModal, ScoreModal } from './AdminModals'
@@ -210,7 +210,7 @@ export default function Admin({ context, session }) {
     setModal({
       kind: 'confirm',
       title: 'Remove this score?',
-      body: `${row.team1} vs ${row.team2} will revert to the live feed (or unplayed).`,
+      body: `${getDisplayName(row.team1)} vs ${getDisplayName(row.team2)} will revert to the live feed (or unplayed).`,
       confirmLabel: 'Remove',
       onConfirm: async () => {
         const { error } = await supabase.rpc('delete_match_result', { p_id: row.manualId })
@@ -296,7 +296,7 @@ export default function Admin({ context, session }) {
                           <button key={p.id} onClick={() => setModal({ kind: 'editPick', pick: p })}
                             className="flex items-center gap-1.5 bg-white rounded-md px-2.5 py-1.5 cursor-pointer hover:bg-[#efefef] transition-colors">
                             <span className="text-[15px] leading-none">{t?.flag}</span>
-                            <span className="text-[12px] font-medium">{t?.name || `#${p.team_id}`}</span>
+                            <span className="text-[12px] font-medium">{t?.displayName ?? t?.name ?? `#${p.team_id}`}</span>
                             <span className="text-[10px] text-[#0a0a0a]/30">edit</span>
                           </button>
                         )
@@ -331,11 +331,11 @@ export default function Admin({ context, session }) {
             return (
               <div key={row.key} className="bg-[#f7f7f7] rounded-lg px-4 py-3 flex items-center gap-3">
                 <span className="text-[10px] uppercase tracking-[0.08em] text-[#0a0a0a]/40 w-28 shrink-0 truncate">{row.stage || '—'}</span>
-                <span className="flex-1 text-[14px] text-right truncate">{row.team1 || 'TBC'}</span>
+                <span className="flex-1 text-[14px] text-right truncate">{row.team1 ? getDisplayName(row.team1) : 'TBC'}</span>
                 <span className="text-[14px] font-semibold tabular-nums w-14 text-center">
                   {played ? `${row.score1}–${row.score2}` : '–'}
                 </span>
-                <span className="flex-1 text-[14px] truncate">{row.team2 || 'TBC'}</span>
+                <span className="flex-1 text-[14px] truncate">{row.team2 ? getDisplayName(row.team2) : 'TBC'}</span>
                 {row.manual && (
                   <span className="text-[9px] uppercase tracking-[0.08em] text-[#0a0a0a]/40 bg-[#e9e9e9] rounded px-1.5 py-0.5 shrink-0">Manual</span>
                 )}

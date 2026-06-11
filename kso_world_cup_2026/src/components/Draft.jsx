@@ -298,7 +298,7 @@ function TeamCard({ team, isClickable, onClick }) {
       }`}
     >
       <span className="text-[22px] leading-none">{team.flag}</span>
-      <p className="text-[12px] font-semibold leading-tight truncate">{team.name}</p>
+      <p className="text-[12px] font-semibold leading-tight truncate">{team.displayName ?? team.name}</p>
       <p className="text-[10px] text-[#0a0a0a]/50">
         {group ? `Group ${group}` : '—'}
       </p>
@@ -567,7 +567,7 @@ function DraftBoard({ group, membership, members, draftSession, draftOrder, pick
             <div className="bg-[#f7f7f7] rounded-xl p-4 flex items-center gap-3">
               <span className="text-[40px] leading-none">{pendingPick.team.flag}</span>
               <div className="flex flex-col gap-0.5 min-w-0">
-                <p className="text-[18px] font-semibold leading-tight truncate">{pendingPick.team.name}</p>
+                <p className="text-[18px] font-semibold leading-tight truncate">{pendingPick.team.displayName ?? pendingPick.team.name}</p>
                 <p className="text-[12px] text-[#0a0a0a]/50">
                   {TEAM_GROUPS[pendingPick.team.name] ? `Group ${TEAM_GROUPS[pendingPick.team.name]}` : '—'}
                   {' · '}#{pendingPick.team.fifaRank} · {MULTIPLIER_LABEL[pendingPick.team.tier]}

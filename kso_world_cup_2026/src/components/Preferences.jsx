@@ -66,7 +66,7 @@ function SortableTeamRow({ team, rank, isPicked }) {
       {/* Team info */}
       <div className="bg-[#e9e9e9] rounded-[4px] px-3 flex items-center gap-3 flex-1 h-full min-w-0">
         <span className="text-[28px] leading-none shrink-0">{team.flag}</span>
-        <p className="text-[18px] font-semibold leading-[1.1] tracking-[-0.02em] truncate min-w-0 flex-1">{team.name}</p>
+        <p className="text-[18px] font-semibold leading-[1.1] tracking-[-0.02em] truncate min-w-0 flex-1">{team.displayName ?? team.name}</p>
         <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-[12px] text-[#0a0a0a]/40">
           <div className="flex flex-col items-end leading-tight tabular-nums">
             <span>Group {TEAM_GROUPS[team.name] ?? '—'}</span>

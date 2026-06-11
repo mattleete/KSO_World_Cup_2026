@@ -56,7 +56,7 @@ function TeamStatRow({ team, stats, dark, divider }) {
     <div className={`flex items-center gap-2 py-2 ${divider ? `border-t ${border}` : ''}`}>
       <span className="text-[16px] leading-none shrink-0">{team.flag}</span>
       <p className={`flex-1 min-w-0 truncate text-[13px] font-semibold ${dark ? 'text-white' : ''}`}>
-        {team.name}
+        {team.displayName ?? team.name}
       </p>
       {/* W·D·L */}
       <p className={`shrink-0 text-[11px] tabular-nums ${muted}`}>
@@ -86,7 +86,7 @@ function MatchResultRow({ match, dark }) {
     <div className={`flex items-center gap-2 sm:gap-3 py-1.5 border-b last:border-0 ${dark ? 'border-white/8' : 'border-[#0a0a0a]/6'}`}>
       <p className={`text-[10px] w-14 sm:w-24 shrink-0 truncate ${dark ? 'text-white/30' : 'text-[#0a0a0a]/40'}`}>{match.stage}</p>
       <span className="text-[15px] leading-none shrink-0">{opponent?.flag ?? '🏳️'}</span>
-      <p className={`text-[12px] flex-1 min-w-0 truncate ${dark ? 'text-white/70' : 'text-[#0a0a0a]/70'}`}>{match.opponent}</p>
+      <p className={`text-[12px] flex-1 min-w-0 truncate ${dark ? 'text-white/70' : 'text-[#0a0a0a]/70'}`}>{opponent?.displayName ?? match.opponent}</p>
       <p className={`text-[12px] font-mono tabular-nums shrink-0 ${dark ? 'text-white' : ''}`}>
         {match.myScore}–{match.oppScore}
       </p>
@@ -105,7 +105,7 @@ function TeamMatchList({ team, results, dark, divider }) {
       <div className="flex items-center gap-2 mb-1.5">
         <span className="text-[15px] leading-none">{team.flag}</span>
         <p className={`text-[11px] font-semibold uppercase tracking-[0.06em] ${dark ? 'text-white/60' : 'text-[#0a0a0a]/50'}`}>
-          {team.name}
+          {team.displayName ?? team.name}
         </p>
       </div>
       {matches.length === 0 ? (

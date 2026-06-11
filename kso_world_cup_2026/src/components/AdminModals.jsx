@@ -121,7 +121,7 @@ export function EditPickModal({ pick, ownerByTeamId, onSaved, onClose }) {
               >
                 <span className="text-[18px] leading-none">{t.flag}</span>
                 <span className="flex flex-col min-w-0">
-                  <span className="text-[12px] font-semibold truncate">{t.name}</span>
+                  <span className="text-[12px] font-semibold truncate">{t.displayName ?? t.name}</span>
                   {owner && !isCurrent && (
                     <span className="text-[10px] text-[#0a0a0a]/40 truncate">{owner}</span>
                   )}
@@ -171,7 +171,7 @@ export function AddPickModal({ member, groupId, availableTeams, onAdded, onClose
               <button key={t.id} onClick={() => choose(t.id)} disabled={busy}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-left cursor-pointer disabled:opacity-50 transition-colors bg-[#f0f0f0] hover:bg-[#e6e6e6]">
                 <span className="text-[18px] leading-none">{t.flag}</span>
-                <span className="text-[12px] font-semibold truncate">{t.name}</span>
+                <span className="text-[12px] font-semibold truncate">{t.displayName ?? t.name}</span>
               </button>
             ))}
           </div>
@@ -184,7 +184,7 @@ export function AddPickModal({ member, groupId, availableTeams, onAdded, onClose
 // ── Enter / override a match score (superadmin) ─────────────────────────────────
 // prefill: { id, team1, team2, stage, score1, score2 } (id null = new result).
 // manual: current manual results array, used for the duplicate guard.
-const teamNames = TEAMS.map(t => t.name)
+const teamOptions = TEAMS.map(t => ({ value: t.name, label: t.displayName ?? t.name }))
 
 export function ScoreModal({ prefill = {}, manual = [], onSaved, onClose }) {
   const [team1, setTeam1] = useState(prefill.team1 || '')
@@ -240,7 +240,7 @@ export function ScoreModal({ prefill = {}, manual = [], onSaved, onClose }) {
           <div className="flex gap-2">
             <select value={team1} onChange={e => setTeam1(e.target.value)} className={selectCls + ' flex-1'}>
               <option value="">Team 1…</option>
-              {teamNames.map(n => <option key={n} value={n}>{n}</option>)}
+              {teamOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <input type="number" min="0" inputMode="numeric" value={score1}
               onChange={e => setScore1(e.target.value)} placeholder="0"
@@ -250,7 +250,7 @@ export function ScoreModal({ prefill = {}, manual = [], onSaved, onClose }) {
           <div className="flex gap-2">
             <select value={team2} onChange={e => setTeam2(e.target.value)} className={selectCls + ' flex-1'}>
               <option value="">Team 2…</option>
-              {teamNames.map(n => <option key={n} value={n}>{n}</option>)}
+              {teamOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <input type="number" min="0" inputMode="numeric" value={score2}
               onChange={e => setScore2(e.target.value)} placeholder="0"

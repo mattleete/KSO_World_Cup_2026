@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchFixtures } from '../utils/api'
 import { fetchManualResults, resultKey } from '../utils/results'
-import { getTeamByName, getTeamById } from '../data/teams'
+import { getTeamByName, getTeamById, getDisplayName } from '../data/teams'
 import { calcMatchPoints } from '../utils/scoring'
 import { DUMMY_FIXTURES, DUMMY_OWNERS } from '../data/dummyFixtures'
 
@@ -76,7 +76,7 @@ function MatchCard({ match, ownerByTeamName }) {
         {/* Home */}
         <div className="flex-1 flex flex-col items-start gap-0.5 min-w-0">
           <span className="text-[22px] leading-none">{homeTeam?.flag ?? '🏳️'}</span>
-          <p className="text-[13px] font-semibold leading-tight truncate w-full">{match.team1 ?? 'TBC'}</p>
+          <p className="text-[13px] font-semibold leading-tight truncate w-full">{homeTeam?.displayName ?? match.team1 ?? 'TBC'}</p>
         </div>
 
         {/* Score or vs */}
@@ -93,7 +93,7 @@ function MatchCard({ match, ownerByTeamName }) {
         {/* Away */}
         <div className="flex-1 flex flex-col items-end gap-0.5 min-w-0">
           <span className="text-[22px] leading-none">{awayTeam?.flag ?? '🏳️'}</span>
-          <p className="text-[13px] font-semibold leading-tight truncate w-full text-right">{match.team2 ?? 'TBC'}</p>
+          <p className="text-[13px] font-semibold leading-tight truncate w-full text-right">{awayTeam?.displayName ?? match.team2 ?? 'TBC'}</p>
         </div>
       </div>
 
@@ -203,7 +203,7 @@ export default function Fixtures({ context }) {
   const now = new Date()
   const nextMatch = fixtures.find(m => m.score1 == null && m.date && new Date(m.date) > now)
   const heroText = nextMatch
-    ? `Next up: ${nextMatch.team1 ?? 'TBC'} vs ${nextMatch.team2 ?? 'TBC'}`
+    ? `Next up: ${nextMatch.team1 ? getDisplayName(nextMatch.team1) : 'TBC'} vs ${nextMatch.team2 ? getDisplayName(nextMatch.team2) : 'TBC'}`
     : 'Fixtures'
 
   const sorted = [...fixtures].sort((a, b) => {

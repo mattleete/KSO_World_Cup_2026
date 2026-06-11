@@ -45,7 +45,7 @@ src/
     AdminModals.jsx     # confirm / rename / edit-pick / score modals for the admin page
     Preferences.jsx     # drag-and-drop team preference ranking list
   data/
-    teams.js            # 48 WC2026 teams with tier, flag, FIFA rank, apiName; TIER_CONFIG multipliers
+    teams.js            # 48 WC2026 teams with tier, flag, FIFA rank, apiName, optional displayName; TIER_CONFIG multipliers; getDisplayName()
     teamGroups.js       # team name → World Cup group letter (A–L)
     dummyFixtures.js    # dummy fixtures + a full 24-player completed draft for UI testing
     dummyResults.js     # test match results (UI testing only)
@@ -189,6 +189,9 @@ Handled via `apiName` field in `teams.js` and `normalizeTeamName()` in `api.js`.
 | Bosnia-Herzegovina | Bosnia & Herzegovina |
 
 Algeria (id: 47) and Curaçao (id: 48) appear in the API but are not drafted in any KSO group.
+
+## Display names
+The internal `name` is the stable key used for group lookups (`teamGroups.js`), scoring/`resultKey` matching, saved `match_results`, and API normalization (`apiName` → `name`). Some teams also have a `displayName` with the country's official name (Turkey → Türkiye, Czech Republic → Czechia, Ivory Coast → Côte d'Ivoire, Cape Verde → Cabo Verde, USA → United States, Bosnia & Herzegovina → Bosnia and Herzegovina). Only what's **shown** uses `displayName` (via `team.displayName ?? team.name` or `getDisplayName(name)`); never change `name` for display, or you'll break the keyed lookups. `Teams.jsx` and `PlayerBoard.jsx` are legacy/unused.
 
 ## Scoring rules
 - Win: 3 pts | Draw: 1 pt | Loss: 0 pts

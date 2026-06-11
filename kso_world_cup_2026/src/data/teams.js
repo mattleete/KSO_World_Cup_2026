@@ -18,7 +18,7 @@ export const TEAMS = [
 
   // ── Upper 12 (FIFA rank 13–24) — ×2 multiplier ──────────────────────────
   { id: 13, name: 'Japan',               flag: '🇯🇵', tier: 'upper',  fifaRank: 13 },
-  { id: 14, name: 'USA',                 flag: '🇺🇸', tier: 'upper',  fifaRank: 14 },
+  { id: 14, name: 'USA',                 flag: '🇺🇸', tier: 'upper',  fifaRank: 14, displayName: 'United States' },
   { id: 15, name: 'Uruguay',             flag: '🇺🇾', tier: 'upper',  fifaRank: 15 },
   { id: 16, name: 'Switzerland',         flag: '🇨🇭', tier: 'upper',  fifaRank: 16 },
   { id: 17, name: 'Mexico',              flag: '🇲🇽', tier: 'upper',  fifaRank: 17 },
@@ -28,16 +28,16 @@ export const TEAMS = [
   { id: 21, name: 'Ecuador',             flag: '🇪🇨', tier: 'upper',  fifaRank: 21 },
   { id: 22, name: 'Canada',              flag: '🇨🇦', tier: 'upper',  fifaRank: 22 },
   { id: 23, name: 'Austria',             flag: '🇦🇹', tier: 'upper',  fifaRank: 23 },
-  { id: 24, name: 'Turkey',              flag: '🇹🇷', tier: 'upper',  fifaRank: 24 },
+  { id: 24, name: 'Turkey',              flag: '🇹🇷', tier: 'upper',  fifaRank: 24, displayName: 'Türkiye' },
 
   // ── Lower 12 (FIFA rank 25–36) — ×3 multiplier ──────────────────────────
   { id: 25, name: 'Australia',           flag: '🇦🇺', tier: 'lower',  fifaRank: 25 },
   { id: 26, name: 'Norway',              flag: '🇳🇴', tier: 'lower',  fifaRank: 26 },
   { id: 27, name: 'Sweden',              flag: '🇸🇪', tier: 'lower',  fifaRank: 27 },
-  { id: 28, name: 'Czech Republic',      flag: '🇨🇿', tier: 'lower',  fifaRank: 28, apiName: 'Czechia'           },
+  { id: 28, name: 'Czech Republic',      flag: '🇨🇿', tier: 'lower',  fifaRank: 28, apiName: 'Czechia', displayName: 'Czechia' },
   { id: 29, name: 'Scotland',            flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', tier: 'lower',  fifaRank: 29 },
   { id: 30, name: 'Paraguay',            flag: '🇵🇾', tier: 'lower',  fifaRank: 30 },
-  { id: 31, name: 'Ivory Coast',         flag: '🇨🇮', tier: 'lower',  fifaRank: 31, apiName: "Côte d'Ivoire"    },
+  { id: 31, name: 'Ivory Coast',         flag: '🇨🇮', tier: 'lower',  fifaRank: 31, apiName: "Côte d'Ivoire", displayName: "Côte d'Ivoire" },
   { id: 32, name: 'Tunisia',             flag: '🇹🇳', tier: 'lower',  fifaRank: 32 },
   { id: 33, name: 'Saudi Arabia',        flag: '🇸🇦', tier: 'lower',  fifaRank: 33 },
   { id: 34, name: 'Uzbekistan',          flag: '🇺🇿', tier: 'lower',  fifaRank: 34 },
@@ -49,11 +49,11 @@ export const TEAMS = [
   { id: 38, name: 'Ghana',               flag: '🇬🇭', tier: 'bottom', fifaRank: 38 },
   { id: 39, name: 'Egypt',               flag: '🇪🇬', tier: 'bottom', fifaRank: 39 },
   { id: 40, name: 'South Africa',        flag: '🇿🇦', tier: 'bottom', fifaRank: 40 },
-  { id: 41, name: 'Cape Verde',          flag: '🇨🇻', tier: 'bottom', fifaRank: 41, apiName: 'Cabo Verde'        },
+  { id: 41, name: 'Cape Verde',          flag: '🇨🇻', tier: 'bottom', fifaRank: 41, apiName: 'Cabo Verde', displayName: 'Cabo Verde' },
   { id: 42, name: 'DR Congo',            flag: '🇨🇩', tier: 'bottom', fifaRank: 42, apiName: 'Congo DR'           },
   { id: 43, name: 'Haiti',               flag: '🇭🇹', tier: 'bottom', fifaRank: 43 },
   { id: 44, name: 'New Zealand',         flag: '🇳🇿', tier: 'bottom', fifaRank: 44 },
-  { id: 45, name: 'Bosnia & Herzegovina',flag: '🇧🇦', tier: 'bottom', fifaRank: 45, apiName: 'Bosnia-Herzegovina' },
+  { id: 45, name: 'Bosnia & Herzegovina',flag: '🇧🇦', tier: 'bottom', fifaRank: 45, apiName: 'Bosnia-Herzegovina', displayName: 'Bosnia and Herzegovina' },
   { id: 46, name: 'Jordan',              flag: '🇯🇴', tier: 'bottom', fifaRank: 46 },
   { id: 47, name: 'Algeria',             flag: '🇩🇿', tier: 'bottom', fifaRank: 47 },
   { id: 48, name: 'Curaçao',             flag: '🇨🇼', tier: 'bottom', fifaRank: 48 },
@@ -72,6 +72,14 @@ export function getTeamById(id) {
 
 export function getTeamByName(name) {
   return TEAMS.find(t => t.name === name || t.apiName === name)
+}
+
+// Official display name for a canonical team name (falls back to the name
+// itself). The internal `name` stays the stable key for groups, scoring, and
+// saved results; only what's shown to users changes.
+export function getDisplayName(name) {
+  const t = getTeamByName(name)
+  return t?.displayName ?? t?.name ?? name
 }
 
 export function getMultiplier(tier) {
