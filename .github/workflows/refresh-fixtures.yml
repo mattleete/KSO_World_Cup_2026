@@ -1,18 +1,19 @@
 name: Refresh WC2026 fixtures
 
-# Fetches the WC2026 /matches feed on a schedule and caches it in Supabase
-# (table: match_feed, single row id='wc2026'). All clients read that table
-# instead of calling the API directly, so API usage no longer scales with the
-# number of viewers. Every 5 minutes = 288 calls/day, under the 500/day plan
-# (leaves ~212/day headroom for manual runs). 5 min is GitHub's minimum cron
-# interval. Public repo, so Actions minutes are unlimited.
+# GitHub's `schedule` event is unreliable for short intervals — in practice it
+# fires every few HOURS, not every 5 min, so the cache lagged badly during live
+# matches. Instead, each job runs a long-lived loop that fetches every 5 min for
+# ~5h40m. `concurrency` (cancel-in-progress: false) means a freshly-scheduled
+# run queues and takes over the moment the current job ends, so fetching stays
+# ~continuous regardless of when GitHub actually fires the schedule.
+# ~286 API calls/day (under the 500/day plan). Public repo => Actions minutes
+# are unlimited. workflow_dispatch lets you (re)start the chain manually.
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
-  workflow_dispatch: {}   # allows a manual "Run workflow" from the Actions tab
+    - cron: '*/15 * * * *'   # frequent restart attempts; concurrency keeps just one alive
+  workflow_dispatch: {}
 
-# Never let two refreshes run at once.
 concurrency:
   group: refresh-fixtures
   cancel-in-progress: false
@@ -20,33 +21,33 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 350     # ~5h50m, under GitHub's 6h job limit
     steps:
-      - name: Fetch WC2026 feed and cache it in Supabase
+      - name: Continuously cache the WC2026 feed (every 5 min)
         env:
           WC2026_API_KEY: ${{ secrets.WC2026_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          set -euo pipefail
-
-          # 1. Pull the live feed. -f makes curl fail (non-zero) on HTTP errors,
-          #    so a bad/disabled key aborts the job and leaves the cache intact.
-          MATCHES=$(curl -fsS -H "Authorization: Bearer ${WC2026_API_KEY}" \
-            "https://api.wc2026api.com/matches")
-
-          # 2. Sanity-check it's a JSON array before caching it.
-          echo "$MATCHES" | jq -e 'type == "array"' > /dev/null
-          echo "Fetched $(echo "$MATCHES" | jq 'length') matches."
-
-          # 3. Build the upsert row and write it (service_role bypasses RLS).
-          PAYLOAD=$(jq -n --argjson m "$MATCHES" \
-            '{id: "wc2026", matches: $m, fetched_at: (now | todateiso8601)}')
-
-          curl -fsS -X POST "${SUPABASE_URL}/rest/v1/match_feed" \
-            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: resolution=merge-duplicates" \
-            --data "$PAYLOAD" > /dev/null
-
-          echo "Cached feed to Supabase match_feed."
+          # No `-e`: a transient API/Supabase hiccup must not kill the whole loop.
+          set -uo pipefail
+          deadline=$(( $(date +%s) + 340*60 ))   # loop ~5h40m, then the queued run takes over
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            if MATCHES=$(curl -fsS -H "Authorization: Bearer ${WC2026_API_KEY}" "https://api.wc2026api.com/matches") \
+               && echo "$MATCHES" | jq -e 'type == "array"' >/dev/null 2>&1; then
+              PAYLOAD=$(jq -n --argjson m "$MATCHES" '{id: "wc2026", matches: $m, fetched_at: (now | todateiso8601)}')
+              if curl -fsS -X POST "${SUPABASE_URL}/rest/v1/match_feed" \
+                   -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+                   -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+                   -H "Content-Type: application/json" \
+                   -H "Prefer: resolution=merge-duplicates" \
+                   --data "$PAYLOAD" >/dev/null; then
+                echo "$(date -u +%H:%M:%S) refreshed $(echo "$MATCHES" | jq length) matches"
+              else
+                echo "$(date -u +%H:%M:%S) supabase write failed (will retry next cycle)"
+              fi
+            else
+              echo "$(date -u +%H:%M:%S) feed fetch failed (will retry next cycle)"
+            fi
+            sleep 300
+          done
