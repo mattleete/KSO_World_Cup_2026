@@ -2,7 +2,7 @@ import { useFixtureData } from '../hooks/useFixtureData'
 import CollapsibleSection from './CollapsibleSection'
 import { MatchGrid } from './MatchCard'
 import GroupStandings from './GroupStandings'
-import { aestDateKey, todayKey, yesterdayKey, isPlayed } from '../utils/fixtures'
+import { aestDateKey, todayKey, isPlayed } from '../utils/fixtures'
 
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 const byDateDesc = (a, b) => (b.date ? new Date(b.date) : -Infinity) - (a.date ? new Date(a.date) : -Infinity)
@@ -14,12 +14,10 @@ function EmptyNote({ children }) {
 export default function Results({ context }) {
   const { fixtures, ownerByTeamName, myTeamNames, loading, error } = useFixtureData(context)
 
-  const today     = todayKey()
-  const yesterday = yesterdayKey()
+  const today = todayKey()
 
-  const todayMatches     = fixtures.filter(m => aestDateKey(m.date) === today).sort(byDateDesc)
-  const yesterdayMatches = fixtures.filter(m => aestDateKey(m.date) === yesterday).sort(byDateDesc)
-  const completed        = fixtures.filter(isPlayed).sort(byDateDesc)
+  const todayMatches = fixtures.filter(m => aestDateKey(m.date) === today).sort(byDateDesc)
+  const completed    = fixtures.filter(isPlayed).sort(byDateDesc)
 
   const grid = matches => (
     <MatchGrid matches={matches} ownerByTeamName={ownerByTeamName} myTeamNames={myTeamNames} />
@@ -40,10 +38,6 @@ export default function Results({ context }) {
         <div className="pb-16 flex flex-col gap-10">
           <CollapsibleSection title="Today's matches" count={todayMatches.length} defaultOpen>
             {todayMatches.length ? grid(todayMatches) : <EmptyNote>No matches today.</EmptyNote>}
-          </CollapsibleSection>
-
-          <CollapsibleSection title="Yesterday's matches" count={yesterdayMatches.length} defaultOpen>
-            {yesterdayMatches.length ? grid(yesterdayMatches) : <EmptyNote>No matches yesterday.</EmptyNote>}
           </CollapsibleSection>
 
           <CollapsibleSection title="Group standings" defaultOpen={false}>

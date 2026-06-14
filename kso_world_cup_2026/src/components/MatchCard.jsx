@@ -1,6 +1,6 @@
 import { getTeamByName } from '../data/teams'
 import { calcMatchPoints } from '../utils/scoring'
-import { isLive, isPlayed, toAESTTime, formatCountdown } from '../utils/fixtures'
+import { isLive, isPlayed, formatCountdown, shortDayLabel, toAESTTimeLabel } from '../utils/fixtures'
 
 // Responsive grid of match tiles: full-width single column on mobile, 3/4
 // columns on larger screens.
@@ -42,20 +42,25 @@ export default function MatchCard({ match, ownerByTeamName, mine = false }) {
 
   return (
     <div className={`rounded-[6px] px-4 py-3 flex flex-col gap-3 ${cardClass} ${mineClass}`}>
-      {/* Stage · status */}
-      <div className="flex items-center gap-1.5">
-        {live && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />}
-        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 truncate">
-          {live
-            ? `${match.stage ?? 'TBC'} · Live`
-            : complete
-              ? `${match.stage ?? 'TBC'} · Full time`
-              : countdown
-                ? `${match.stage ?? 'TBC'} · ${countdown}`
-                : match.date
-                  ? `${match.stage ?? 'TBC'} · ${toAESTTime(match.date)}`
+      {/* Stage · status, then date · kickoff time (AEST) on every tile */}
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-1.5">
+          {live && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />}
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 truncate">
+            {live
+              ? `${match.stage ?? 'TBC'} · Live`
+              : complete
+                ? `${match.stage ?? 'TBC'} · Full time`
+                : countdown
+                  ? `${match.stage ?? 'TBC'} · ${countdown}`
                   : (match.stage ?? 'TBC')}
-        </p>
+          </p>
+        </div>
+        {match.date && (
+          <p className="text-[10px] font-medium text-[#0a0a0a]/40 truncate">
+            {shortDayLabel(match.date)} · {toAESTTimeLabel(match.date)}
+          </p>
+        )}
       </div>
 
       {/* Teams + score */}

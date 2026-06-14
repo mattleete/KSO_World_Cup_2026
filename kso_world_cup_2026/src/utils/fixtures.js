@@ -73,6 +73,22 @@ export function toAESTTime(dateStr) {
   return dateStr ? aestTimeLabel.format(new Date(dateStr)) : 'TBC'
 }
 
+// Concise AEST date for section headings / tiles, e.g. "Mon, 15 June".
+const aestShortDay = new Intl.DateTimeFormat('en-AU', {
+  timeZone: 'Australia/Sydney',
+  weekday: 'short', day: 'numeric', month: 'short',
+})
+export function shortDayLabel(date) {
+  return date ? aestShortDay.format(new Date(date)) : ''
+}
+
+// Kickoff time labelled with the timezone, e.g. "7:30pm AEST". The World Cup
+// (Jun–Jul) falls in Australian Eastern Standard Time, so the label is fixed.
+export function toAESTTimeLabel(dateStr) {
+  if (!dateStr) return null
+  return aestTimeLabel.format(new Date(dateStr)).replace(/\s+/g, '').toLowerCase() + ' AEST'
+}
+
 /** "in 3d", "in 2h 14m", "in 45m" — or null if the date is past/missing. */
 export function formatCountdown(dateStr, now = Date.now()) {
   if (!dateStr) return null
