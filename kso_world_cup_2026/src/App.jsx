@@ -4,6 +4,7 @@ import Nav from './components/Nav'
 import Landing from './components/Landing'
 import PicksAndPoints from './components/PicksAndPoints'
 import Fixtures from './components/Fixtures'
+import Results from './components/Results'
 import Rules from './components/Rules'
 import LoginModal from './components/Login'
 import OnboardingModal from './components/OnboardingModal'
@@ -115,6 +116,8 @@ export default function App() {
     }
 
     if (activeTab === 'fixtures') return <Fixtures context={context} />
+
+    if (activeTab === 'results') return <Results context={context} />
 
     if (activeTab === 'draft') {
       if (session === undefined) return null

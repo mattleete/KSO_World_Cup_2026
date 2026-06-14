@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 const TABS = [
   { id: 'picks',    label: 'Picks & Points' },
   { id: 'fixtures', label: 'Fixtures'        },
+  { id: 'results',  label: 'Results'         },
   { id: 'draft',    label: 'Draft'           },
   { id: 'rules',    label: 'Rules'           },
 ]
