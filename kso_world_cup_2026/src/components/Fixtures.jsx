@@ -8,6 +8,7 @@ import {
 } from '../utils/fixtures'
 
 const byDateAsc = (a, b) => (a.date ? new Date(a.date) : Infinity) - (b.date ? new Date(b.date) : Infinity)
+const byDateDesc = (a, b) => (b.date ? new Date(b.date) : -Infinity) - (a.date ? new Date(a.date) : -Infinity)
 
 function EmptyNote({ children }) {
   return <p className="text-[13px] text-[#0a0a0a]/40">{children}</p>
@@ -18,7 +19,8 @@ export default function Fixtures({ context }) {
 
   const today = todayKey()
 
-  const todayMatches  = fixtures.filter(m => aestDateKey(m.date) === today).sort(byDateAsc)
+  // Only games still to come or in progress — completed games live in Results.
+  const todayMatches  = fixtures.filter(m => aestDateKey(m.date) === today && !isPlayed(m)).sort(byDateDesc)
   const upcomingGroup = fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m)).sort(byDateAsc)
   const upcomingKnockout = fixtures
     .filter(m => isKnockout(m.stage) && !isPlayed(m) && bothTeamsKnown(m))
