@@ -3,11 +3,9 @@ import CollapsibleSection from './CollapsibleSection'
 import { MatchGrid } from './MatchCard'
 import { getDisplayName } from '../data/teams'
 import {
-  aestDateKey, todayKey, tomorrowKey, shortDayLabel,
+  aestDateKey, todayKey, shortDayLabel,
   isPlayed, isGroupStage, isKnockout, bothTeamsKnown,
 } from '../utils/fixtures'
-
-const DAY_MS = 24 * 60 * 60 * 1000
 
 const byDateAsc = (a, b) => (a.date ? new Date(a.date) : Infinity) - (b.date ? new Date(b.date) : Infinity)
 
@@ -18,12 +16,10 @@ function EmptyNote({ children }) {
 export default function Fixtures({ context }) {
   const { fixtures, ownerByTeamName, myTeamNames, loading, error } = useFixtureData(context)
 
-  const today    = todayKey()
-  const tomorrow = tomorrowKey()
+  const today = todayKey()
 
-  const todayMatches    = fixtures.filter(m => aestDateKey(m.date) === today).sort(byDateAsc)
-  const tomorrowMatches = fixtures.filter(m => aestDateKey(m.date) === tomorrow).sort(byDateAsc)
-  const upcomingGroup   = fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m)).sort(byDateAsc)
+  const todayMatches  = fixtures.filter(m => aestDateKey(m.date) === today).sort(byDateAsc)
+  const upcomingGroup = fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m)).sort(byDateAsc)
   const upcomingKnockout = fixtures
     .filter(m => isKnockout(m.stage) && !isPlayed(m) && bothTeamsKnown(m))
     .sort(byDateAsc)
@@ -53,10 +49,6 @@ export default function Fixtures({ context }) {
         <div className="pb-16 flex flex-col gap-10">
           <CollapsibleSection title={`Today's matches · ${shortDayLabel(new Date())}`} count={todayMatches.length} defaultOpen>
             {todayMatches.length ? grid(todayMatches) : <EmptyNote>No matches today.</EmptyNote>}
-          </CollapsibleSection>
-
-          <CollapsibleSection title={`Tomorrow's matches · ${shortDayLabel(new Date(Date.now() + DAY_MS))}`} count={tomorrowMatches.length} defaultOpen>
-            {tomorrowMatches.length ? grid(tomorrowMatches) : <EmptyNote>No matches tomorrow.</EmptyNote>}
           </CollapsibleSection>
 
           <CollapsibleSection title="Upcoming group stage" count={upcomingGroup.length} defaultOpen={false}>
