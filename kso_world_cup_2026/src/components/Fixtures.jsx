@@ -4,7 +4,7 @@ import { MatchGrid } from './MatchCard'
 import { getDisplayName } from '../data/teams'
 import {
   aestDateKey, todayKey, shortDayLabel,
-  isPlayed, isGroupStage, isKnockout, bothTeamsKnown,
+  isLive, isPlayed, isGroupStage, isKnockout, bothTeamsKnown,
 } from '../utils/fixtures'
 
 const byDateAsc = (a, b) => (a.date ? new Date(a.date) : Infinity) - (b.date ? new Date(b.date) : Infinity)
@@ -26,11 +26,16 @@ export default function Fixtures({ context }) {
     .filter(m => isKnockout(m.stage) && !isPlayed(m) && bothTeamsKnown(m))
     .sort(byDateAsc)
 
+  const teamsLabel = m => `${m.team1 ? getDisplayName(m.team1) : 'TBC'} vs ${m.team2 ? getDisplayName(m.team2) : 'TBC'}`
+
   const now = new Date()
+  const liveMatch = fixtures.find(isLive)
   const nextMatch = fixtures.find(m => m.score1 == null && m.date && new Date(m.date) > now)
-  const heroText = nextMatch
-    ? `Next up: ${nextMatch.team1 ? getDisplayName(nextMatch.team1) : 'TBC'} vs ${nextMatch.team2 ? getDisplayName(nextMatch.team2) : 'TBC'}`
-    : 'Fixtures'
+  const heroText = liveMatch
+    ? `LIVE: ${teamsLabel(liveMatch)}`
+    : nextMatch
+      ? `Next up: ${teamsLabel(nextMatch)}`
+      : 'Fixtures'
 
   const grid = matches => (
     <MatchGrid matches={matches} ownerByTeamName={ownerByTeamName} myTeamNames={myTeamNames} />
