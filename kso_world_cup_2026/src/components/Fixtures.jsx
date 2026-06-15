@@ -1,6 +1,6 @@
 import { useFixtureData } from '../hooks/useFixtureData'
 import CollapsibleSection from './CollapsibleSection'
-import { MatchGrid } from './MatchCard'
+import { MatchGrid, MatchDateGroups } from './MatchCard'
 import { useTeamFilter } from './TeamFilter'
 import { getDisplayName } from '../data/teams'
 import {
@@ -23,7 +23,8 @@ export default function Fixtures({ context }) {
 
   // Only games still to come or in progress — completed games live in Results.
   const todayMatches  = apply(fixtures.filter(m => aestDateKey(m.date) === today && !isPlayed(m)).sort(byDateDesc))
-  const upcomingGroup = apply(fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m)).sort(byDateAsc))
+  // Exclude today's games — they're already shown in the Today's matches section.
+  const upcomingGroup = apply(fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m) && aestDateKey(m.date) !== today).sort(byDateAsc))
   const upcomingKnockout = apply(fixtures
     .filter(m => isKnockout(m.stage) && !isPlayed(m) && bothTeamsKnown(m))
     .sort(byDateAsc))
@@ -41,6 +42,9 @@ export default function Fixtures({ context }) {
 
   const grid = matches => (
     <MatchGrid matches={matches} ownerByTeamName={ownerByTeamName} myTeamNames={myTeamNames} />
+  )
+  const datedGrid = matches => (
+    <MatchDateGroups matches={matches} ownerByTeamName={ownerByTeamName} myTeamNames={myTeamNames} />
   )
 
   return (
@@ -63,11 +67,11 @@ export default function Fixtures({ context }) {
           </CollapsibleSection>
 
           <CollapsibleSection title="Upcoming group stage" count={upcomingGroup.length} defaultOpen={false}>
-            {upcomingGroup.length ? grid(upcomingGroup) : <EmptyNote>Group stage complete.</EmptyNote>}
+            {upcomingGroup.length ? datedGrid(upcomingGroup) : <EmptyNote>Group stage complete.</EmptyNote>}
           </CollapsibleSection>
 
           <CollapsibleSection title="Upcoming knockout stage" count={upcomingKnockout.length} defaultOpen={false}>
-            {upcomingKnockout.length ? grid(upcomingKnockout) : <EmptyNote>Knockout matchups are set once the group stage finishes.</EmptyNote>}
+            {upcomingKnockout.length ? datedGrid(upcomingKnockout) : <EmptyNote>Knockout matchups are set once the group stage finishes.</EmptyNote>}
           </CollapsibleSection>
         </div>
       )}

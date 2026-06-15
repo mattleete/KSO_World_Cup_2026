@@ -1,6 +1,6 @@
 import { getTeamByName } from '../data/teams'
 import { calcMatchPoints } from '../utils/scoring'
-import { isLive, isPlayed, formatCountdown, shortDayLabel, toAESTTimeLabel } from '../utils/fixtures'
+import { aestDateKey, isLive, isPlayed, formatCountdown, shortDayLabel, toAESTTimeLabel } from '../utils/fixtures'
 
 // Responsive grid of match tiles: full-width single column on mobile, 3/4
 // columns on larger screens.
@@ -14,6 +14,31 @@ export function MatchGrid({ matches, ownerByTeamName, myTeamNames }) {
           ownerByTeamName={ownerByTeamName}
           mine={myTeamNames?.has(match.team1) || myTeamNames?.has(match.team2)}
         />
+      ))}
+    </div>
+  )
+}
+
+// Cluster an already-sorted match list into per-day groups (insertion order
+// preserved), each under a "Day, Date" header. Used by the multi-day sections.
+export function MatchDateGroups({ matches, ownerByTeamName, myTeamNames }) {
+  const groups = []
+  const index = new Map()
+  for (const m of matches) {
+    const key = m.date ? aestDateKey(m.date) : 'TBC'
+    if (!index.has(key)) { index.set(key, groups.length); groups.push({ key, date: m.date, matches: [] }) }
+    groups[index.get(key)].matches.push(m)
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {groups.map(g => (
+        <div key={g.key} className="flex flex-col gap-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40">
+            {g.date ? shortDayLabel(g.date) : 'Date TBC'}
+          </p>
+          <MatchGrid matches={g.matches} ownerByTeamName={ownerByTeamName} myTeamNames={myTeamNames} />
+        </div>
       ))}
     </div>
   )

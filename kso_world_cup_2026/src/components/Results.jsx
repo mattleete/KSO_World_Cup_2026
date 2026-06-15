@@ -1,6 +1,6 @@
 import { useFixtureData } from '../hooks/useFixtureData'
 import CollapsibleSection from './CollapsibleSection'
-import { MatchGrid } from './MatchCard'
+import { MatchGrid, MatchDateGroups } from './MatchCard'
 import GroupStandings from './GroupStandings'
 import { useTeamFilter } from './TeamFilter'
 import { aestDateKey, todayKey, isPlayed } from '../utils/fixtures'
@@ -53,7 +53,9 @@ export default function Results({ context }) {
           </CollapsibleSection>
 
           <CollapsibleSection title="All completed matches" count={completed.length} defaultOpen={false}>
-            {completed.length ? grid(completed) : <EmptyNote>No completed matches yet.</EmptyNote>}
+            {completed.length
+              ? <MatchDateGroups matches={completed} ownerByTeamName={ownerByTeamName} myTeamNames={myTeamNames} />
+              : <EmptyNote>No completed matches yet.</EmptyNote>}
           </CollapsibleSection>
         </div>
       )}
