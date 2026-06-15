@@ -67,9 +67,9 @@ export default function MatchCard({ match, ownerByTeamName, mine = false }) {
 
   return (
     <div className={`rounded-[6px] px-4 py-3 flex flex-col gap-3 ${cardClass} ${mineClass}`}>
-      {/* Stage · status, then date · kickoff time (AEST) on every tile */}
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-center gap-1.5">
+      {/* Stage · status on the left; date · kickoff time (AEST) top-right */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
           {live && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />}
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 truncate">
             {live
@@ -82,7 +82,7 @@ export default function MatchCard({ match, ownerByTeamName, mine = false }) {
           </p>
         </div>
         {match.date && (
-          <p className="text-[10px] font-medium text-[#0a0a0a]/40 truncate">
+          <p className="text-[10px] font-medium text-[#0a0a0a]/40 text-right shrink-0 whitespace-nowrap">
             {shortDayLabel(match.date)} · {toAESTTimeLabel(match.date)}
           </p>
         )}
