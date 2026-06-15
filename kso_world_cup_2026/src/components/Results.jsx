@@ -2,6 +2,7 @@ import { useFixtureData } from '../hooks/useFixtureData'
 import CollapsibleSection from './CollapsibleSection'
 import { MatchGrid } from './MatchCard'
 import GroupStandings from './GroupStandings'
+import { useTeamFilter } from './TeamFilter'
 import { aestDateKey, todayKey, isPlayed } from '../utils/fixtures'
 
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
@@ -14,10 +15,11 @@ function EmptyNote({ children }) {
 export default function Results({ context }) {
   const { fixtures, ownerByTeamName, myTeamNames, loading, error } = useFixtureData(context)
 
+  const { FilterBar, apply } = useTeamFilter(myTeamNames)
   const today = todayKey()
 
-  const todayMatches = fixtures.filter(m => aestDateKey(m.date) === today).sort(byDateDesc)
-  const completed    = fixtures.filter(isPlayed).sort(byDateDesc)
+  const todayMatches = apply(fixtures.filter(m => aestDateKey(m.date) === today).sort(byDateDesc))
+  const completed    = apply(fixtures.filter(isPlayed).sort(byDateDesc))
 
   const grid = matches => (
     <MatchGrid matches={matches} ownerByTeamName={ownerByTeamName} myTeamNames={myTeamNames} />
@@ -36,6 +38,8 @@ export default function Results({ context }) {
 
       {!loading && !error && (
         <div className="pb-16 flex flex-col gap-10">
+          {FilterBar}
+
           <CollapsibleSection title="Today's matches" count={todayMatches.length} defaultOpen>
             {todayMatches.length ? grid(todayMatches) : <EmptyNote>No matches today.</EmptyNote>}
           </CollapsibleSection>

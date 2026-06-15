@@ -1,6 +1,7 @@
 import { useFixtureData } from '../hooks/useFixtureData'
 import CollapsibleSection from './CollapsibleSection'
 import { MatchGrid } from './MatchCard'
+import { useTeamFilter } from './TeamFilter'
 import { getDisplayName } from '../data/teams'
 import {
   aestDateKey, todayKey, shortDayLabel,
@@ -17,14 +18,15 @@ function EmptyNote({ children }) {
 export default function Fixtures({ context }) {
   const { fixtures, ownerByTeamName, myTeamNames, loading, error } = useFixtureData(context)
 
+  const { FilterBar, apply } = useTeamFilter(myTeamNames)
   const today = todayKey()
 
   // Only games still to come or in progress — completed games live in Results.
-  const todayMatches  = fixtures.filter(m => aestDateKey(m.date) === today && !isPlayed(m)).sort(byDateDesc)
-  const upcomingGroup = fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m)).sort(byDateAsc)
-  const upcomingKnockout = fixtures
+  const todayMatches  = apply(fixtures.filter(m => aestDateKey(m.date) === today && !isPlayed(m)).sort(byDateDesc))
+  const upcomingGroup = apply(fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m)).sort(byDateAsc))
+  const upcomingKnockout = apply(fixtures
     .filter(m => isKnockout(m.stage) && !isPlayed(m) && bothTeamsKnown(m))
-    .sort(byDateAsc)
+    .sort(byDateAsc))
 
   const teamsLabel = m => `${m.team1 ? getDisplayName(m.team1) : 'TBC'} vs ${m.team2 ? getDisplayName(m.team2) : 'TBC'}`
 
@@ -54,6 +56,8 @@ export default function Fixtures({ context }) {
 
       {!loading && !error && (
         <div className="pb-16 flex flex-col gap-10">
+          {FilterBar}
+
           <CollapsibleSection title={`Today's matches · ${shortDayLabel(new Date())}`} count={todayMatches.length} defaultOpen>
             {todayMatches.length ? grid(todayMatches) : <EmptyNote>No matches today.</EmptyNote>}
           </CollapsibleSection>
