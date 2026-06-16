@@ -4,10 +4,11 @@ import { MatchGrid, MatchDateGroups } from './MatchCard'
 import { useTeamFilter } from './TeamFilter'
 import { getDisplayName } from '../data/teams'
 import {
-  aestDateKey, todayKey, shortDayLabel,
+  aestDateKey, todayKey, tomorrowKey, shortDayLabel,
   isLive, isPlayed, isGroupStage, isKnockout, bothTeamsKnown,
 } from '../utils/fixtures'
 
+const DAY_MS = 24 * 60 * 60 * 1000
 const byDateAsc = (a, b) => (a.date ? new Date(a.date) : Infinity) - (b.date ? new Date(b.date) : Infinity)
 const byDateDesc = (a, b) => (b.date ? new Date(b.date) : -Infinity) - (a.date ? new Date(a.date) : -Infinity)
 
@@ -20,11 +21,23 @@ export default function Fixtures({ context }) {
 
   const { FilterBar, apply } = useTeamFilter(myTeamNames)
   const today = todayKey()
+  const tomorrow = tomorrowKey()
 
-  // Only games still to come or in progress — completed games live in Results.
-  const todayMatches  = apply(fixtures.filter(m => aestDateKey(m.date) === today && !isPlayed(m)).sort(byDateDesc))
-  // Exclude today's games — they're already shown in the Today's matches section.
-  const upcomingGroup = apply(fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m) && aestDateKey(m.date) !== today).sort(byDateAsc))
+  // Top section shows today's still-to-come / in-progress games. Once they're
+  // all done (or there are none today), it rolls over to tomorrow's matches.
+  const todayUpcoming = fixtures.filter(m => aestDateKey(m.date) === today && !isPlayed(m))
+  const showTomorrow  = todayUpcoming.length === 0
+  const topDayKey     = showTomorrow ? tomorrow : today
+  const topTitle      = showTomorrow ? "Tomorrow's matches" : "Today's matches"
+  const topDateLabel  = shortDayLabel(new Date(Date.now() + (showTomorrow ? DAY_MS : 0)))
+  const topMatches = apply(
+    fixtures
+      .filter(m => aestDateKey(m.date) === topDayKey && (showTomorrow || !isPlayed(m)))
+      .sort(byDateDesc)
+  )
+
+  // Exclude the featured day's games — they're already shown in the top section.
+  const upcomingGroup = apply(fixtures.filter(m => isGroupStage(m.stage) && !isPlayed(m) && aestDateKey(m.date) !== topDayKey).sort(byDateAsc))
   const upcomingKnockout = apply(fixtures
     .filter(m => isKnockout(m.stage) && !isPlayed(m) && bothTeamsKnown(m))
     .sort(byDateAsc))
@@ -62,8 +75,8 @@ export default function Fixtures({ context }) {
         <div className="pb-16 flex flex-col gap-10">
           {FilterBar}
 
-          <CollapsibleSection title={`Today's matches · ${shortDayLabel(new Date())}`} count={todayMatches.length} defaultOpen>
-            {todayMatches.length ? grid(todayMatches) : <EmptyNote>No matches today.</EmptyNote>}
+          <CollapsibleSection title={`${topTitle} · ${topDateLabel}`} count={topMatches.length} defaultOpen>
+            {topMatches.length ? grid(topMatches) : <EmptyNote>No matches {showTomorrow ? 'tomorrow' : 'today'}.</EmptyNote>}
           </CollapsibleSection>
 
           <CollapsibleSection title="Upcoming group stage" count={upcomingGroup.length} defaultOpen={false}>
