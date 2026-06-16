@@ -33,7 +33,7 @@ export default function Fixtures({ context }) {
   const topMatches = apply(
     fixtures
       .filter(m => aestDateKey(m.date) === topDayKey && (showTomorrow || !isPlayed(m)))
-      .sort(byDateDesc)
+      .sort(byDateAsc)
   )
 
   // Exclude the featured day's games — they're already shown in the top section.
