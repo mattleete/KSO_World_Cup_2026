@@ -50,6 +50,42 @@ export function calcMatchPoints(teamName, match) {
 }
 
 /**
+ * True if a match was decided by a penalty shootout — a level score at full
+ * time (after extra time) with penalty scores recorded on the match.
+ */
+export function wentToShootout(match) {
+  return (
+    match.score1 != null && match.score2 != null &&
+    match.score1 === match.score2 &&
+    match.pen1 != null && match.pen2 != null
+  )
+}
+
+/** Name of the team that won the shootout, or null if it wasn't one. */
+export function shootoutWinner(match) {
+  if (!wentToShootout(match)) return null
+  return match.pen1 > match.pen2 ? match.team1 : match.team2
+}
+
+/**
+ * W / D / L outcome for a team in a match, penalty-aware: a shootout is a win
+ * for the shootout winner and a loss for the loser — never a draw.
+ *
+ * @param {string} teamName
+ * @param {object} match - { team1, score1, team2, score2, pen1?, pen2? }
+ * @returns {'W'|'D'|'L'}
+ */
+export function teamResult(teamName, match) {
+  const isTeam1  = teamName === match.team1
+  const myScore  = isTeam1 ? match.score1 : match.score2
+  const oppScore = isTeam1 ? match.score2 : match.score1
+  if (myScore === oppScore && wentToShootout(match)) {
+    return shootoutWinner(match) === teamName ? 'W' : 'L'
+  }
+  return myScore > oppScore ? 'W' : myScore === oppScore ? 'D' : 'L'
+}
+
+/**
  * Total points earned by a single team across all completed matches.
  *
  * @param {number} teamId  - Team ID from teams.js

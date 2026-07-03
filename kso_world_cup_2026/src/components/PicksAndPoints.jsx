@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { getTeamById, getTeamByName } from '../data/teams'
 import { loadAllResults } from '../utils/results'
-import { calcMatchPoints } from '../utils/scoring'
+import { calcMatchPoints, teamResult, wentToShootout } from '../utils/scoring'
 import { DUMMY_RESULTS } from '../data/dummyResults'
 import { DUMMY_DRAFT_PLAYERS, DUMMY_ALL_PICKS } from '../data/dummyFixtures'
 
@@ -16,13 +16,16 @@ function getTeamMatches(teamName, results) {
       const isHome   = match.team1 === teamName
       const myScore  = isHome ? match.score1 : match.score2
       const oppScore = isHome ? match.score2 : match.score1
-      const result   = myScore > oppScore ? 'W' : myScore === oppScore ? 'D' : 'L'
+      const shootout = wentToShootout(match)
       return {
         stage:    match.stage,
         opponent: isHome ? match.team2 : match.team1,
         myScore,
         oppScore,
-        result,
+        // Penalty-aware result: a shootout is a W for the winner, L for the loser.
+        result:   teamResult(teamName, match),
+        myPens:   shootout ? (isHome ? match.pen1 : match.pen2) : null,
+        oppPens:  shootout ? (isHome ? match.pen2 : match.pen1) : null,
         pts: calcMatchPoints(teamName, match),
       }
     })
@@ -39,8 +42,10 @@ function getTeamStats(teamName, results) {
     const oppScore = isHome ? match.score2 : match.score1
     GF += myScore
     GA += oppScore
-    if (myScore > oppScore) W++
-    else if (myScore === oppScore) D++
+    // Penalty-aware W/D/L: a shootout win counts in the W column, not as a draw.
+    const r = teamResult(teamName, match)
+    if (r === 'W') W++
+    else if (r === 'D') D++
     else L++
     pts += calcMatchPoints(teamName, match)
   })
@@ -89,6 +94,11 @@ function MatchResultRow({ match, dark }) {
       <p className={`text-[12px] flex-1 min-w-0 truncate ${dark ? 'text-white/70' : 'text-[#0a0a0a]/70'}`}>{opponent?.displayName ?? match.opponent}</p>
       <p className={`text-[12px] font-mono tabular-nums shrink-0 ${dark ? 'text-white' : ''}`}>
         {match.myScore}–{match.oppScore}
+        {match.myPens != null && (
+          <span className={`ml-1 text-[10px] ${dark ? 'text-white/50' : 'text-[#0a0a0a]/45'}`}>
+            ({match.myPens}–{match.oppPens} pens)
+          </span>
+        )}
       </p>
       <p className={`text-[11px] font-bold w-4 shrink-0 ${resultColour}`}>{match.result}</p>
       <p className={`text-[12px] font-semibold w-10 text-right shrink-0 ${dark ? 'text-white' : ''}`}>

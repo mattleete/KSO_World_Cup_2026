@@ -1,5 +1,5 @@
 import { getTeamByName } from '../data/teams'
-import { calcMatchPoints } from '../utils/scoring'
+import { calcMatchPoints, wentToShootout, shootoutWinner } from '../utils/scoring'
 import { aestDateKey, isLive, isPlayed, formatCountdown, shortDayLabel, toAESTTimeLabel } from '../utils/fixtures'
 
 // Responsive grid of match tiles: full-width single column on mobile, 3/4
@@ -55,6 +55,9 @@ export default function MatchCard({ match, ownerByTeamName, mine = false }) {
   const live = isLive(match)
   const complete = isPlayed(match)
   const countdown = !hasScore && !live ? formatCountdown(match.date) : null
+  const shootout = complete && wentToShootout(match)
+  const penWinnerName = shootout ? shootoutWinner(match) : null
+  const penWinnerTeam = penWinnerName === match.team1 ? homeTeam : awayTeam
 
   // Always render a border so the live green border doesn't change card size
   // relative to its neighbours in the grid.
@@ -97,9 +100,16 @@ export default function MatchCard({ match, ownerByTeamName, mine = false }) {
 
         <div className="flex flex-col items-center shrink-0 min-w-[52px]">
           {hasScore ? (
-            <p className="text-[20px] font-semibold tracking-[-0.02em] leading-none text-[#0a0a0a]">
-              {match.score1}–{match.score2}
-            </p>
+            <>
+              <p className="text-[20px] font-semibold tracking-[-0.02em] leading-none text-[#0a0a0a]">
+                {match.score1}–{match.score2}
+              </p>
+              {shootout && (
+                <p className="mt-1 text-[10px] font-medium leading-none text-[#0a0a0a]/45 whitespace-nowrap">
+                  {match.pen1}–{match.pen2} pens
+                </p>
+              )}
+            </>
           ) : (
             <p className="text-[12px] font-medium text-[#0a0a0a]/30 uppercase tracking-[0.06em]">vs</p>
           )}
@@ -110,6 +120,13 @@ export default function MatchCard({ match, ownerByTeamName, mine = false }) {
           <p className="text-[13px] font-semibold leading-tight truncate w-full text-right">{awayTeam?.displayName ?? match.team2 ?? 'TBC'}</p>
         </div>
       </div>
+
+      {/* Penalty shootout result — make the winner unambiguous */}
+      {shootout && (
+        <p className="-mt-1 text-[11px] font-medium text-center text-[#0a0a0a]/60">
+          🏆 {penWinnerTeam?.displayName ?? penWinnerName} won on penalties
+        </p>
+      )}
 
       {/* Owner names + points (only when at least one team is owned) */}
       {(homeOwnerName || awayOwnerName) && (
