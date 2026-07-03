@@ -68,6 +68,8 @@ export async function fetchFixtures() {
     stage:  formatStage(m.round, m.group_name),
     score1: m.home_score,
     score2: m.away_score,
+    pen1:   m.home_pen ?? null,
+    pen2:   m.away_pen ?? null,
     status: m.status ?? null,
   }))
 
@@ -89,6 +91,8 @@ export async function fetchResults() {
       score1: m.home_score,
       team2:  normalizeTeamName(m.away_team),
       score2: m.away_score,
+      pen1:   m.home_pen ?? null,
+      pen2:   m.away_pen ?? null,
       stage:  formatStage(m.round, m.group_name),
       date:   m.kickoff_utc,
     }))

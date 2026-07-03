@@ -28,6 +28,8 @@ export async function fetchManualResults() {
     score1: r.score1,
     team2:  r.team2,
     score2: r.score2,
+    pen1:   r.pen1 ?? null,   // present only once match_results gains pen columns
+    pen2:   r.pen2 ?? null,
     stage:  r.stage,
     date:   r.played_at,
     manual: true,
