@@ -79,13 +79,16 @@ export async function fetchFixtures() {
 
 /**
  * Fetch completed match results from the WC2026 API.
- * Returns only matches that have scores (i.e. have been played).
+ * Returns only matches the feed marks `status === 'completed'` — a live,
+ * in-progress match also carries a running score, but counting it would score
+ * an unfinished game (and a knockout level at full time still needs its
+ * shootout resolved). Scoring must wait until the match is final.
  */
 export async function fetchResults() {
   const matches = await fetchRawMatches()
 
   return matches
-    .filter(m => m.home_score !== null && m.away_score !== null)
+    .filter(m => m.status === 'completed' && m.home_score !== null && m.away_score !== null)
     .map(m => ({
       team1:  normalizeTeamName(m.home_team),
       score1: m.home_score,
