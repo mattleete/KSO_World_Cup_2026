@@ -6,49 +6,48 @@ import { getTeamByName, getDisplayName } from '../data/teams'
 const flagOf = name => getTeamByName(name)?.flag ?? '🏳️'
 const nameOf = name => getDisplayName(name)
 
-function SectionLabel({ children }) {
+// Every drafted team with points/owner/tier/seed — flattened from the standings
+// (single source of truth), seed/tier resolved from teams.js by FIFA rank.
+const ALL_TEAMS = FINAL.standings.flatMap(p =>
+  p.teams.map(([team, pts]) => {
+    const rank = getTeamByName(team)?.fifaRank
+    return { team, pts, owner: p.player, rank, tier: Math.ceil(rank / 12) }
+  })
+)
+const MAX_PTS = Math.max(...ALL_TEAMS.map(t => t.pts))
+const SEED_ORDER = [...ALL_TEAMS].sort((a, b) => a.rank - b.rank)
+const BY_NAME = Object.fromEntries(ALL_TEAMS.map(t => [t.team, t]))
+// Draft order (pick 1 → last). Populated from FINAL.draftOrder once available;
+// the section only renders when the pick order is known.
+const DRAFT_ORDERED = (FINAL.draftOrder ?? []).map(n => BY_NAME[n]).filter(Boolean)
+
+// ── collapsible section (minimised by default) ────────────────────────────────
+function Collapsible({ label, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#0a0a0a]/40 mb-4">
-      {children}
-    </p>
+    <div className="border-b border-[#0a0a0a]/10">
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 py-4 px-0 text-left bg-transparent border-none cursor-pointer group"
+      >
+        <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#0a0a0a]/45 group-hover:text-[#0a0a0a]/75 transition-colors">
+          {label}
+        </span>
+        <span className="text-[9px] text-[#0a0a0a]/30 shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && <div className="pb-8">{children}</div>}
+    </div>
   )
 }
 
-function TeamChip({ name, pts, dark }) {
-  const muted = dark ? 'text-white/45' : 'text-[#0a0a0a]/45'
+function TeamChip({ name, pts }) {
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
       <span className="text-[13px] leading-none">{flagOf(name)}</span>
-      <span className={`text-[12px] ${dark ? 'text-white/80' : 'text-[#0a0a0a]/75'}`}>{nameOf(name)}</span>
-      {pts != null && <span className={`text-[12px] tabular-nums ${muted}`}>{pts}</span>}
+      <span className="text-[12px] text-[#0a0a0a]/75">{nameOf(name)}</span>
+      {pts != null && <span className="text-[12px] tabular-nums text-[#0a0a0a]/45">{pts}</span>}
     </span>
-  )
-}
-
-// ── podium ────────────────────────────────────────────────────────────────────
-function PodiumCard({ p, place, medal, big }) {
-  return (
-    <div className={`flex-1 rounded-xl px-5 py-6 ${big ? 'bg-[#0a0a0a] text-white' : 'bg-[#f7f7f7]'}`}>
-      <div className="flex items-baseline justify-between mb-3">
-        <span className={`text-[11px] font-medium uppercase tracking-[0.1em] ${big ? 'text-white/50' : 'text-[#0a0a0a]/40'}`}>{place}</span>
-        <span className="text-[20px] leading-none">{medal}</span>
-      </div>
-      <p className={`font-semibold leading-none ${big ? 'text-[28px]' : 'text-[22px]'}`}>{p.player}</p>
-      <p className={`mt-1 text-[15px] tabular-nums font-semibold ${big ? 'text-white/70' : 'text-[#0a0a0a]/50'}`}>{p.total} pts</p>
-      <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1">
-        {p.teams.map(t => <TeamChip key={t} name={t} dark={big} />)}
-      </div>
-    </div>
-  )
-}
-
-function Podium() {
-  return (
-    <div className="flex flex-col sm:flex-row gap-2.5">
-      <PodiumCard p={FINAL.champion} place="Champion"  medal="🥇" big />
-      <PodiumCard p={FINAL.runnerUp} place="Runner-up" medal="🥈" />
-      <PodiumCard p={FINAL.third}    place="Third"     medal="🥉" />
-    </div>
   )
 }
 
@@ -83,13 +82,12 @@ function StandingsTable() {
   )
 }
 
-// ── two-column stat block (top teams / tiers / hauls / zeros) ─────────────────
-function TopTeams() {
-  const max = FINAL.topTeams[0].pts
+// ── generic team bar list (flag · name · owner · points bar · ×tier) ──────────
+function BarList({ items, max = MAX_PTS }) {
   return (
     <div className="flex flex-col gap-1.5">
-      {FINAL.topTeams.map(t => (
-        <div key={t.team} className="flex items-center gap-3">
+      {items.map((t, i) => (
+        <div key={t.team + i} className="flex items-center gap-3">
           <span className="text-[15px] leading-none shrink-0">{flagOf(t.team)}</span>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline justify-between gap-2">
@@ -99,7 +97,7 @@ function TopTeams() {
               <p className="text-[13px] font-semibold tabular-nums shrink-0">{t.pts}</p>
             </div>
             <div className="mt-1 h-1.5 rounded-full bg-[#ececec] overflow-hidden">
-              <div className="h-full bg-[#0a0a0a] rounded-full" style={{ width: `${(t.pts / max) * 100}%` }} />
+              <div className="h-full bg-[#0a0a0a] rounded-full" style={{ width: `${max ? (t.pts / max) * 100 : 0}%` }} />
             </div>
           </div>
           <span className="shrink-0 text-[10px] font-medium text-[#0a0a0a]/35 w-6 text-right">×{t.tier}</span>
@@ -154,11 +152,11 @@ function DraftValue() {
   return (
     <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 mb-1.5">Biggest steals</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 mb-1.5">Draft best value picks</p>
         {FINAL.draftValue.best.map(r => <DraftRow key={r.team} r={r} sign={1} />)}
       </div>
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 mb-1.5">Biggest reaches</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 mb-1.5">Draft worst value picks</p>
         {FINAL.draftValue.worst.map(r => <DraftRow key={r.team} r={r} sign={-1} />)}
       </div>
       <p className="sm:col-span-2 text-[11px] text-[#0a0a0a]/40">
@@ -171,7 +169,6 @@ function DraftValue() {
 
 // ── main ──────────────────────────────────────────────────────────────────────
 export default function SeasonRecap() {
-  const [showMethod, setShowMethod] = useState(false)
   return (
     <div className="max-w-3xl mx-auto">
       {/* Hero */}
@@ -182,56 +179,45 @@ export default function SeasonRecap() {
         <h1 className="text-[40px] sm:text-[56px] lg:text-[64px] font-semibold leading-none" style={{ letterSpacing: '-2.4px' }}>
           Jess wins it<br />on 57.
         </h1>
-        <p className="mt-5 text-[15px] leading-relaxed text-[#0a0a0a]/55 max-w-xl">
-          Spain beat Argentina 1–0 to win the World Cup — but the Occy Picks title went to Jess,
-          whose two teams were both out by the Round of 16. A 2-point margin over Matt settled the
-          closest possible finish. All {FINAL.matchesPlayed} matches complete.
-        </p>
       </div>
 
-      <div className="flex flex-col gap-14 mt-12">
-        {/* Podium */}
-        <section><SectionLabel>Podium</SectionLabel><Podium /></section>
+      {/* Collapsible sections — all minimised by default */}
+      <div className="mt-10 border-t border-[#0a0a0a]/10">
+        <Collapsible label="Final standings · all 23">
+          <StandingsTable />
+        </Collapsible>
 
-        {/* Standings */}
-        <section><SectionLabel>Final standings · all 23</SectionLabel><StandingsTable /></section>
+        <Collapsible label="Top-scoring teams">
+          <BarList items={FINAL.topTeams} />
+        </Collapsible>
 
-        {/* Top teams */}
-        <section>
-          <SectionLabel>Top-scoring teams</SectionLabel>
-          <TopTeams />
-        </section>
-
-        {/* Tiers */}
-        <section>
-          <SectionLabel>Tier (multiplier) performance</SectionLabel>
+        <Collapsible label="Tier (multiplier) performance">
           <Tiers />
-        </section>
+        </Collapsible>
 
-        {/* Draft value */}
-        <section>
-          <SectionLabel>Draft value</SectionLabel>
+        <Collapsible label="Draft value">
           <DraftValue />
-        </section>
+        </Collapsible>
 
-        {/* Methodology */}
-        <section>
-          <button
-            onClick={() => setShowMethod(s => !s)}
-            className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#0a0a0a]/40 hover:text-[#0a0a0a]/70 bg-transparent border-none cursor-pointer p-0 flex items-center gap-2"
-          >
-            Methodology & notes <span className="text-[9px]">{showMethod ? '▲' : '▼'}</span>
-          </button>
-          {showMethod && (
-            <ul className="mt-4 flex flex-col gap-2.5 list-none">
-              {FINAL.methodology.map((m, i) => (
-                <li key={i} className="text-[13px] leading-relaxed text-[#0a0a0a]/55 pl-4 relative">
-                  <span className="absolute left-0 text-[#0a0a0a]/25">·</span>{m}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {DRAFT_ORDERED.length > 0 && (
+          <Collapsible label="Draft order with points">
+            <BarList items={DRAFT_ORDERED} />
+          </Collapsible>
+        )}
+
+        <Collapsible label="Original team seed order">
+          <BarList items={SEED_ORDER} />
+        </Collapsible>
+
+        <Collapsible label="Methodology & notes">
+          <ul className="flex flex-col gap-2.5 list-none">
+            {FINAL.methodology.map((m, i) => (
+              <li key={i} className="text-[13px] leading-relaxed text-[#0a0a0a]/55 pl-4 relative">
+                <span className="absolute left-0 text-[#0a0a0a]/25">·</span>{m}
+              </li>
+            ))}
+          </ul>
+        </Collapsible>
       </div>
     </div>
   )
