@@ -6,6 +6,7 @@ import PicksAndPoints from './components/PicksAndPoints'
 import Fixtures from './components/Fixtures'
 import Results from './components/Results'
 import Rules from './components/Rules'
+import SeasonRecap from './components/SeasonRecap'
 import LoginModal from './components/Login'
 import OnboardingModal from './components/OnboardingModal'
 import { EditNameModal, JoinLeagueModal, CreateLeagueModal } from './components/AccountModals'
@@ -114,6 +115,8 @@ export default function App() {
         />
       )
     }
+
+    if (activeTab === 'recap') return <SeasonRecap />
 
     if (activeTab === 'fixtures') return <Fixtures context={context} />
 

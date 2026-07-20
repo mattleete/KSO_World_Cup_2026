@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 
 const TABS = [
   { id: 'picks',    label: 'Picks & Points' },
+  { id: 'recap',    label: 'Final Results'  },
   { id: 'fixtures', label: 'Fixtures'        },
   { id: 'results',  label: 'Results'         },
   { id: 'draft',    label: 'Draft'           },
@@ -109,14 +110,26 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, disp
           </div>
         )}
 
-        {/* Logged out → direct Log in button (mobile + desktop); no hamburger */}
+        {/* Logged out → public Final Results tab + Log in button (mobile + desktop); no hamburger */}
         {!loggedIn && session !== undefined && (
-          <button
-            onClick={onLoginClick}
-            className="block text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a] border border-[#0a0a0a]/20 rounded-lg px-4 py-2 cursor-pointer hover:border-[#0a0a0a]/60 bg-transparent transition-colors"
-          >
-            Log in →
-          </button>
+          <div className="flex items-center gap-5 sm:gap-8">
+            <button
+              onClick={() => handleTabChange('recap')}
+              className={`shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] transition-opacity cursor-pointer bg-transparent border-none p-2 ${
+                activeTab === 'recap'
+                  ? 'text-[#0a0a0a]'
+                  : 'text-[#0a0a0a]/40 hover:text-[#0a0a0a]/70'
+              }`}
+            >
+              Final Results
+            </button>
+            <button
+              onClick={onLoginClick}
+              className="block text-[11px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a] border border-[#0a0a0a]/20 rounded-lg px-4 py-2 cursor-pointer hover:border-[#0a0a0a]/60 bg-transparent transition-colors"
+            >
+              Log in →
+            </button>
+          </div>
         )}
 
         {/* Mobile hamburger — only when logged in (there are tabs/account to show) */}

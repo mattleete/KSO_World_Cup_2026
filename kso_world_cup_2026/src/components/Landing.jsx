@@ -189,7 +189,7 @@ export default function Landing() {
     ? <>The world cup starts in<br className="sm:hidden" /> {days} days</>
     : days === 1 ? 'The world cup starts tomorrow'
     : days === 0 ? 'The world cup starts today'
-    : 'The world cup is underway'
+    : 'The world cup is over — Spain won!'
 
   const heroRef    = useRef(null)
   const occyRef    = useRef(null)
