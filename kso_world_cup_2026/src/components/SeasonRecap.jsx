@@ -83,20 +83,6 @@ function StandingsTable() {
   )
 }
 
-// ── insight cards ─────────────────────────────────────────────────────────────
-function Insights() {
-  return (
-    <div className="grid sm:grid-cols-2 gap-2.5">
-      {FINAL.insights.map((ins, i) => (
-        <div key={i} className="rounded-xl bg-[#f7f7f7] px-5 py-5">
-          <p className="text-[15px] font-semibold leading-snug mb-2">{ins.title}</p>
-          <p className="text-[13px] leading-relaxed text-[#0a0a0a]/60">{ins.body}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ── two-column stat block (top teams / tiers / hauls / zeros) ─────────────────
 function TopTeams() {
   const max = FINAL.topTeams[0].pts
@@ -191,7 +177,7 @@ export default function SeasonRecap() {
       {/* Hero */}
       <div className="mb-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#0a0a0a]/40 mb-3">
-          Occy Picks 2026 · Final Results
+          Occy Picks 2026 · Post Season Analysis
         </p>
         <h1 className="text-[40px] sm:text-[56px] lg:text-[64px] font-semibold leading-none" style={{ letterSpacing: '-2.4px' }}>
           Jess wins it<br />on 57.
@@ -206,9 +192,6 @@ export default function SeasonRecap() {
       <div className="flex flex-col gap-14 mt-12">
         {/* Podium */}
         <section><SectionLabel>Podium</SectionLabel><Podium /></section>
-
-        {/* Insights */}
-        <section><SectionLabel>What the season showed</SectionLabel><Insights /></section>
 
         {/* Standings */}
         <section><SectionLabel>Final standings · all 23</SectionLabel><StandingsTable /></section>
@@ -229,26 +212,6 @@ export default function SeasonRecap() {
         <section>
           <SectionLabel>Draft value</SectionLabel>
           <DraftValue />
-        </section>
-
-        {/* Records */}
-        <section>
-          <SectionLabel>Records</SectionLabel>
-          <div className="grid sm:grid-cols-2 gap-2.5">
-            <div className="rounded-xl bg-[#f7f7f7] px-5 py-5">
-              <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 mb-2">Biggest single-match haul</p>
-              <p className="text-[14px] leading-relaxed text-[#0a0a0a]/70">
-                A three-way tie at <span className="font-semibold text-[#0a0a0a]">16 points</span> — Egypt, Bosnia & Herzegovina
-                and DR Congo, each a ×4 team winning a group game by 2+ goals.
-              </p>
-            </div>
-            <div className="rounded-xl bg-[#f7f7f7] px-5 py-5">
-              <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-[#0a0a0a]/40 mb-2">Teams that scored zero (6)</p>
-              <div className="flex flex-wrap gap-x-3 gap-y-1.5">
-                {FINAL.zeros.map(z => <TeamChip key={z} name={z} />)}
-              </div>
-            </div>
-          </div>
         </section>
 
         {/* Methodology */}

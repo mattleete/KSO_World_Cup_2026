@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 
 const TABS = [
   { id: 'picks',    label: 'Picks & Points' },
-  { id: 'recap',    label: 'Final Results'  },
+  { id: 'recap',    label: 'Post Season Analysis' },
   { id: 'fixtures', label: 'Fixtures'        },
   { id: 'results',  label: 'Results'         },
   { id: 'draft',    label: 'Draft'           },
@@ -121,7 +121,7 @@ export default function Nav({ activeTab, onTabChange, onLogoClick, session, disp
                   : 'text-[#0a0a0a]/40 hover:text-[#0a0a0a]/70'
               }`}
             >
-              Final Results
+              Post Season Analysis
             </button>
             <button
               onClick={onLoginClick}
