@@ -9,6 +9,25 @@
 export const FINAL = {
   matchesPlayed: 104,
 
+  // Snake draft pick order (pick 1 → 44), reconstructed from the final draft
+  // board and cross-checked against every pick number in the season report.
+  // The last four (Cape Verde, Saudi Arabia, Qatar, Jordan) were undrafted and
+  // auto-assigned to Charlie Cox after the draft — appended here at the end.
+  draftOrder: [
+    // Round 1 (picks 1–22)
+    'Canada', 'Austria', 'Mexico', 'Netherlands', 'Norway', 'Algeria', 'Spain',
+    'France', 'Uruguay', 'Portugal', 'Japan', 'Argentina', 'Sweden', 'USA',
+    'Australia', 'South Korea', 'Egypt', 'Germany', 'Colombia', 'Belgium',
+    'England', 'Brazil',
+    // Round 2 (picks 23–44, snake reversed)
+    'Ghana', 'Switzerland', 'Croatia', 'Ecuador', 'Panama', 'Ivory Coast',
+    'Senegal', 'New Zealand', 'Scotland', 'Czech Republic', 'Morocco', 'Turkey',
+    'Haiti', 'Paraguay', 'Iran', 'Tunisia', 'DR Congo', 'South Africa',
+    'Curaçao', 'Iraq', 'Uzbekistan', 'Bosnia & Herzegovina',
+    // Auto-assigned after the draft
+    'Cape Verde', 'Saudi Arabia', 'Qatar', 'Jordan',
+  ],
+
   // Settled podium
   champion:  { player: 'Jess', total: 57, teams: ['Egypt', 'Ivory Coast'] },
   runnerUp:  { player: 'Matt', total: 55, teams: ['Norway', 'South Africa'] },

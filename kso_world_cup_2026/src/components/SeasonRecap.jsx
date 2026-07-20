@@ -202,6 +202,10 @@ export default function SeasonRecap() {
         {DRAFT_ORDERED.length > 0 && (
           <Collapsible label="Draft order with points">
             <BarList items={DRAFT_ORDERED} />
+            <p className="text-[11px] text-[#0a0a0a]/40 mt-3">
+              Picks 1–44 in snake order. Cape Verde, Saudi Arabia, Qatar and Jordan were
+              auto-assigned to Charlie Cox after the draft.
+            </p>
           </Collapsible>
         )}
 
