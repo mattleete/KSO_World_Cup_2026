@@ -5,6 +5,9 @@ import { getTeamByName, getDisplayName } from '../data/teams'
 // ── helpers ───────────────────────────────────────────────────────────────────
 const flagOf = name => getTeamByName(name)?.flag ?? '🏳️'
 const nameOf = name => getDisplayName(name)
+// Multiplier tier from the canonical FIFA rank (×1 rank 1–12 … ×4 37–48).
+// Derived here so every chart labels multipliers identically and can't drift.
+const tierOf = name => Math.ceil((getTeamByName(name)?.fifaRank ?? 48) / 12)
 
 // Every drafted team with points/owner/tier/seed — flattened from the standings
 // (single source of truth), seed/tier resolved from teams.js by FIFA rank.
@@ -100,7 +103,7 @@ function BarList({ items, max = MAX_PTS }) {
               <div className="h-full bg-[#0a0a0a] rounded-full" style={{ width: `${max ? (t.pts / max) * 100 : 0}%` }} />
             </div>
           </div>
-          <span className="shrink-0 text-[10px] font-medium text-[#0a0a0a]/35 w-6 text-right">×{t.tier}</span>
+          <span className="shrink-0 text-[10px] font-medium text-[#0a0a0a]/35 w-6 text-right">×{tierOf(t.team)}</span>
         </div>
       ))}
     </div>

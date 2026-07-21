@@ -65,10 +65,10 @@ export const FINAL = {
     { team: 'Norway', pts: 39, owner: 'Matt', tier: 3 },
     { team: 'Egypt', pts: 36, owner: 'Jess', tier: 4 },
     { team: 'Switzerland', pts: 30, owner: 'Hannah', tier: 2 },
-    { team: 'Mexico', pts: 30, owner: 'Jess Hamo', tier: 1 },
+    { team: 'Mexico', pts: 30, owner: 'Jess Hamo', tier: 2 },
     { team: 'Spain', pts: 25, owner: 'Amanda', tier: 1 },
     { team: 'Argentina', pts: 25, owner: 'Dave', tier: 1 },
-    { team: 'USA', pts: 24, owner: 'John', tier: 1 },
+    { team: 'USA', pts: 24, owner: 'John', tier: 2 },
     { team: 'France', pts: 23, owner: 'Yiorgo', tier: 1 },
   ],
 
